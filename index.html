@@ -364,7 +364,11 @@ hr.div{border:0;border-top:1px solid var(--border);margin:20px 0}
   <div class="tab-pg" id="itab-scenarios">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
       <div id="scHeadline" style="font-family:var(--serif);font-size:18px;color:var(--ink);line-height:1.3"></div>
-      <button class="btn btn-s" onclick="scenarioAction()" id="scActionBtn">🎯 Generate Scenarios</button>
+      <div style="display:flex;gap:6px;align-items:center">
+        <span id="scDataInfo" style="font-size:11px;color:var(--ink4)"></span>
+        <button class="btn btn-g" onclick="regenScenarios()" id="scRegenBtn" style="font-size:12px;display:none">↻ Regenerate from all data</button>
+        <button class="btn btn-s" onclick="scenarioAction()" id="scActionBtn">🎯 Generate Scenarios</button>
+      </div>
     </div>
 
     <!-- Leaderboard -->
@@ -803,11 +807,15 @@ function renderTechMatrix(sid){
 
 // Scenarios — Leaderboard design
 function renderSc(){
-  const sec=AS();const scenarios=SCEN(sec.id);
+  const sec=AS();const scenarios=SCEN(sec.id);const uc=UCf(sec.id);
   const btn=document.getElementById('scActionBtn');
+  const regenBtn=document.getElementById('scRegenBtn');
+  const dataInfo=document.getElementById('scDataInfo');
   const headline=document.getElementById('scHeadline');
   const lb=document.getElementById('scLeaderboard');
   if(btn){if(scenarios.length){btn.textContent='🤖 Re-evaluate';btn.onclick=evalScenarios}else{btn.textContent='🎯 Generate Scenarios';btn.onclick=genScenarios}}
+  if(regenBtn)regenBtn.style.display=scenarios.length?'inline-flex':'none';
+  if(dataInfo)dataInfo.textContent=uc.length?'Based on '+uc.length+' signals':'';
   if(!scenarios.length){
     if(headline)headline.innerHTML='';
     lb.innerHTML='<div style="text-align:center;padding:40px;color:var(--ink3)"><div style="font-size:36px;margin-bottom:12px">🎯</div><div style="font-size:14px;font-weight:600;color:var(--ink2);margin-bottom:4px">No scenarios yet</div><div style="font-size:13px">Generate 2-3 forward-looking scenarios from your signals</div></div>';
@@ -880,32 +888,36 @@ function showScDetail(i){
 }
 
 function scenarioAction(){const sec=AS();if(SCEN(sec.id).length)evalScenarios();else genScenarios()}
+function regenScenarios(){const sec=AS();if(!confirm('Regenerate scenarios from all '+UCf(sec.id).length+' signals? This replaces the current scenarios.'))return;DB.del('sc_'+sec.id);renderSc();genScenarios()}
 async function genScenarios(){
   if(!DB.get('apiKey'))return toast('⚠ Key needed');const sec=AS();const uc=UCf(sec.id);if(!uc.length)return toast('Run pipeline first');
   const btn=document.getElementById('scActionBtn');btn.disabled=true;btn.textContent='⟳ Generating...';
-  // Build clean signal list — NO jargon, NO internal codes
-  const signalList=uc.slice(0,15).map(u=>u.co+' : '+u.title+' ('+u.ev+')').join('\n');
+  // Build a comprehensive summary of ALL data, not just 15
+  const top=uc.sort((a,b)=>prio(b).sc-prio(a).sc).slice(0,25);
+  const signalList=top.map(u=>u.co+' : '+u.title+' ('+u.ev+')').join('\n');
+  // Count by company
+  const byCo={};uc.forEach(u=>{if(u.co&&u.co!=='—')byCo[u.co]=(byCo[u.co]||0)+1});
+  const topCos=Object.entries(byCo).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([n,c])=>n+' ('+c+' signals)').join(', ');
+  const deployed=uc.filter(u=>['Deployed','Scaled'].includes(u.ev)).length;
   try{const raw=await ai(
-    'You are a senior strategy consultant. You write clearly for executives who have 30 seconds to read. NEVER use internal codes, abbreviations, or jargon like P1/P2/P3/P4. Write in plain, clear English that a CEO would understand.',
-    'Sector: '+sec.name+'\n\nHere are the latest AI signals detected in this sector:\n'+signalList+'\n\nBased on these signals, create 3 strategic scenarios about the future of this sector.\n\nEach scenario should answer: "What if [this specific thing] happens?" — for example "What if Google becomes the main entry point for travel booking?" or "What if hotels bypass OTAs entirely using AI?"\n\nRULES:\n- Scenario names must be short and crystal clear (max 8 words)\n- Description: 2 plain sentences explaining what would happen\n- Drivers: 3 concrete reasons WHY this could happen (real facts, not abstract concepts)\n- Winners: which types of companies would benefit\n- Losers: which types of companies would suffer\n- Probability: low, medium, or high based on current signals\n- This week evidence FOR: 1-2 concrete recent facts that support this scenario (from the signals above). Write like a news headline.\n- This week evidence AGAINST: 1-2 concrete facts that challenge this scenario. Write like a news headline.\n\nReturn ONLY valid JSON array:\n[{"name":"short clear title","description":"2 plain sentences","drivers":["concrete reason 1","concrete reason 2","concrete reason 3"],"winners":["type of company"],"losers":["type of company"],"probability":"low|medium|high","evidence_for":"1-2 news-style facts supporting this","evidence_against":"1-2 news-style facts challenging this"}]',
+    'You are a senior strategy consultant. You write clearly for executives who have 30 seconds to read. NEVER use internal codes, abbreviations, or jargon. Write in plain, clear English that a CEO would understand.',
+    'Sector: '+sec.name+'\n\nDATABASE SUMMARY: '+uc.length+' AI signals total, '+deployed+' already deployed.\nMost active companies: '+topCos+'\n\nTOP 25 SIGNALS (by importance):\n'+signalList+'\n\nBased on ALL '+uc.length+' signals, create 3 strategic scenarios about the future of this sector.\n\nEach scenario should answer: "What if [this specific thing] happens?"\nExamples: "What if Google becomes the main booking channel?" or "What if hotels bypass OTAs using AI?"\n\nRULES:\n- Scenario names: short, crystal clear (max 8 words)\n- Description: 2 plain sentences explaining what would happen\n- Drivers: 3 concrete reasons WHY (real facts from the signals)\n- Winners/Losers: which types of companies benefit or suffer\n- Probability: low, medium, or high\n- Evidence FOR: 1-2 concrete recent facts from signals above (news headline style)\n- Evidence AGAINST: 1-2 facts that challenge this (news headline style)\n\nReturn ONLY valid JSON array:\n[{"name":"short title","description":"2 sentences","drivers":["reason1","reason2","reason3"],"winners":["who"],"losers":["who"],"probability":"low|medium|high","evidence_for":"facts supporting","evidence_against":"facts challenging"}]',
     2048);
-    const sc=pJ(raw);sc.forEach(s=>{s.created=new Date().toISOString();s.last_eval=new Date().toISOString();s.history=[{d:new Date().toISOString(),p:s.probability==='high'?.85:s.probability==='medium'?.5:.2}];
-      // Normalize field names
-      s.confirming_signals=s.evidence_for||s.confirming_signals||'';
-      s.invalidating_signals=s.evidence_against||s.invalidating_signals||'';
-    });
-    DB.set('sc_'+sec.id,sc);renderSc();toast('✓ '+sc.length+' scenarios');
+    const sc=pJ(raw);sc.forEach(s=>{s.created=new Date().toISOString();s.last_eval=new Date().toISOString();s.history=[{d:new Date().toISOString(),p:s.probability==='high'?.85:s.probability==='medium'?.5:.2}];s.confirming_signals=s.evidence_for||s.confirming_signals||'';s.invalidating_signals=s.evidence_against||s.invalidating_signals||'';s.uc_count=uc.length;});
+    DB.set('sc_'+sec.id,sc);renderSc();toast('✓ '+sc.length+' scenarios (from '+uc.length+' signals)');
   }catch(e){toast('⚠ '+e.message)}btn.disabled=false;renderSc()}
 async function evalScenarios(){
   if(!DB.get('apiKey'))return toast('⚠');const sec=AS();const sc=SCEN(sec.id);const uc=UCf(sec.id);if(!sc.length||!uc.length)return toast('Need scenarios + data');
   const btn=document.getElementById('scActionBtn');btn.disabled=true;btn.textContent='⟳ Re-evaluating...';
-  const signalList=uc.slice(0,12).map(u=>u.co+' : '+u.title+' ('+u.ev+')').join('\n');
+  const top=uc.sort((a,b)=>prio(b).sc-prio(a).sc).slice(0,20);
+  const signalList=top.map(u=>u.co+' : '+u.title+' ('+u.ev+')').join('\n');
+  const deployed=uc.filter(u=>['Deployed','Scaled'].includes(u.ev)).length;
   try{const raw=await ai(
     'You re-evaluate strategic scenarios based on new evidence. Write in plain English, like a news analyst. NO jargon, NO codes.',
-    'Here are our scenarios:\n'+sc.map((s,i)=>(i+1)+'. '+s.name+' (currently: '+s.probability+' probability)').join('\n')+'\n\nNew signals detected this week:\n'+signalList+'\n\nFor each scenario, assess:\n- Has the probability changed? (low/medium/high)\n- What recent facts SUPPORT this scenario? Write 1-2 short news-style sentences.\n- What recent facts CHALLENGE this scenario? Write 1-2 short news-style sentences.\n\nReturn ONLY valid JSON array:\n[{"index":0,"probability":"low|medium|high","evidence_for":"1-2 news-style facts","evidence_against":"1-2 news-style facts"}]',
+    'DATABASE: '+uc.length+' total signals, '+deployed+' deployed.\n\nOur scenarios:\n'+sc.map((s,i)=>(i+1)+'. '+s.name+' (currently: '+s.probability+')').join('\n')+'\n\nTop 20 signals by importance:\n'+signalList+'\n\nFor each scenario:\n- Has the probability changed? (low/medium/high)\n- Evidence FOR: 1-2 concrete facts from signals (news headline style)\n- Evidence AGAINST: 1-2 concrete facts (news headline style)\n\nReturn ONLY valid JSON array:\n[{"index":0,"probability":"low|medium|high","evidence_for":"facts","evidence_against":"facts"}]',
     2048);
     const ev=pJ(raw);ev.forEach(e=>{const s=sc[e.index];if(!s)return;s.probability=e.probability;s.confirming_signals=e.evidence_for||e.confirming_signals||'';s.invalidating_signals=e.evidence_against||e.invalidating_signals||'';s.last_eval=new Date().toISOString();if(!s.history)s.history=[];s.history.push({d:new Date().toISOString(),p:e.probability==='high'?.85:e.probability==='medium'?.5:.2})});
-    DB.set('sc_'+sec.id,sc);renderSc();toast('✓ Re-evaluated');
+    DB.set('sc_'+sec.id,sc);renderSc();toast('✓ Re-evaluated ('+uc.length+' signals)');
   }catch(e){toast('⚠ '+e.message)}btn.disabled=false;renderSc()}
 
 async function runPowerShift(){
