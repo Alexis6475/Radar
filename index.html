@@ -373,12 +373,13 @@ hr.div{border:0;border-top:1px solid var(--border);margin:20px 0}
       <div id="scLeaderboard" style="padding:0 24px 20px"></div>
     </div>
 
-    <!-- Power Shift — bar chart -->
+    <!-- Qui gagne, qui perd — bar chart -->
     <div class="card" style="margin-bottom:20px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-        <div class="card-t" style="margin-bottom:0">⚖️ Power Shift</div>
+        <div class="card-t" style="margin-bottom:0">⚖️ Qui gagne, qui perd</div>
         <button class="btn btn-s" onclick="runPowerShift()" id="psBtn" style="font-size:12px">🤖 Analyze</button>
       </div>
+      <div style="font-size:12px;color:var(--ink3);margin-bottom:12px">Impact de l'IA sur l'équilibre des forces entre les acteurs du secteur</div>
       <div id="psSummary" style="font-size:13px;color:var(--ink2);line-height:1.7;margin-bottom:16px"></div>
       <div id="psChart"></div>
     </div>
@@ -882,27 +883,43 @@ function scenarioAction(){const sec=AS();if(SCEN(sec.id).length)evalScenarios();
 async function genScenarios(){
   if(!DB.get('apiKey'))return toast('⚠ Key needed');const sec=AS();const uc=UCf(sec.id);if(!uc.length)return toast('Run pipeline first');
   const btn=document.getElementById('scActionBtn');btn.disabled=true;btn.textContent='⟳ Generating...';
-  try{const raw=await ai('Build 2-3 market scenarios. Return ONLY a valid JSON array. Use double quotes for all property names and string values. Do NOT use apostrophes inside strings — rephrase instead.','Sector: '+sec.name+'\nTheme: '+(sec.tracker?.theme||'')+'\nSignals:\n'+uc.slice(0,15).map(u=>u.co+': '+u.title+' ('+u.ev+', P'+u.pil+')').join('\n')+'\n\nActors: '+POWER_ACTORS.join(', ')+'\n\nReturn: [{"name":"string","description":"2-3 sentences","drivers":["3-4"],"winners":["who"],"losers":["who"],"probability":"low|medium|high","confirming_signals":"what confirms","invalidating_signals":"what invalidates"}]',2048);
-    const sc=pJ(raw);sc.forEach(s=>{s.created=new Date().toISOString();s.last_eval=new Date().toISOString();s.history=[{d:new Date().toISOString(),p:s.probability==='high'?.85:s.probability==='medium'?.5:.2}]});
+  // Build clean signal list — NO jargon, NO internal codes
+  const signalList=uc.slice(0,15).map(u=>u.co+' : '+u.title+' ('+u.ev+')').join('\n');
+  try{const raw=await ai(
+    'You are a senior strategy consultant. You write clearly for executives who have 30 seconds to read. NEVER use internal codes, abbreviations, or jargon like P1/P2/P3/P4. Write in plain, clear English that a CEO would understand.',
+    'Sector: '+sec.name+'\n\nHere are the latest AI signals detected in this sector:\n'+signalList+'\n\nBased on these signals, create 3 strategic scenarios about the future of this sector.\n\nEach scenario should answer: "What if [this specific thing] happens?" — for example "What if Google becomes the main entry point for travel booking?" or "What if hotels bypass OTAs entirely using AI?"\n\nRULES:\n- Scenario names must be short and crystal clear (max 8 words)\n- Description: 2 plain sentences explaining what would happen\n- Drivers: 3 concrete reasons WHY this could happen (real facts, not abstract concepts)\n- Winners: which types of companies would benefit\n- Losers: which types of companies would suffer\n- Probability: low, medium, or high based on current signals\n- This week evidence FOR: 1-2 concrete recent facts that support this scenario (from the signals above). Write like a news headline.\n- This week evidence AGAINST: 1-2 concrete facts that challenge this scenario. Write like a news headline.\n\nReturn ONLY valid JSON array:\n[{"name":"short clear title","description":"2 plain sentences","drivers":["concrete reason 1","concrete reason 2","concrete reason 3"],"winners":["type of company"],"losers":["type of company"],"probability":"low|medium|high","evidence_for":"1-2 news-style facts supporting this","evidence_against":"1-2 news-style facts challenging this"}]',
+    2048);
+    const sc=pJ(raw);sc.forEach(s=>{s.created=new Date().toISOString();s.last_eval=new Date().toISOString();s.history=[{d:new Date().toISOString(),p:s.probability==='high'?.85:s.probability==='medium'?.5:.2}];
+      // Normalize field names
+      s.confirming_signals=s.evidence_for||s.confirming_signals||'';
+      s.invalidating_signals=s.evidence_against||s.invalidating_signals||'';
+    });
     DB.set('sc_'+sec.id,sc);renderSc();toast('✓ '+sc.length+' scenarios');
   }catch(e){toast('⚠ '+e.message)}btn.disabled=false;renderSc()}
 async function evalScenarios(){
   if(!DB.get('apiKey'))return toast('⚠');const sec=AS();const sc=SCEN(sec.id);const uc=UCf(sec.id);if(!sc.length||!uc.length)return toast('Need scenarios + data');
   const btn=document.getElementById('scActionBtn');btn.disabled=true;btn.textContent='⟳ Re-evaluating...';
-  try{const raw=await ai('Evaluate scenarios against signals. Return ONLY a valid JSON array. Use double quotes for all property names. No apostrophes in strings.','Scenarios:\n'+sc.map((s,i)=>(i+1)+'. '+s.name+' ('+s.probability+')').join('\n')+'\n\nLatest:\n'+uc.slice(0,12).map(u=>u.co+': '+u.title+' ('+u.ev+', P'+u.pil+')').join('\n')+'\n\nReturn: [{"index":0,"probability":"low|medium|high","confirming_signals":"string","invalidating_signals":"string"}]',2048);
-    const ev=pJ(raw);ev.forEach(e=>{const s=sc[e.index];if(!s)return;s.probability=e.probability;s.confirming_signals=e.confirming_signals;s.invalidating_signals=e.invalidating_signals;s.last_eval=new Date().toISOString();if(!s.history)s.history=[];s.history.push({d:new Date().toISOString(),p:e.probability==='high'?.85:e.probability==='medium'?.5:.2})});
+  const signalList=uc.slice(0,12).map(u=>u.co+' : '+u.title+' ('+u.ev+')').join('\n');
+  try{const raw=await ai(
+    'You re-evaluate strategic scenarios based on new evidence. Write in plain English, like a news analyst. NO jargon, NO codes.',
+    'Here are our scenarios:\n'+sc.map((s,i)=>(i+1)+'. '+s.name+' (currently: '+s.probability+' probability)').join('\n')+'\n\nNew signals detected this week:\n'+signalList+'\n\nFor each scenario, assess:\n- Has the probability changed? (low/medium/high)\n- What recent facts SUPPORT this scenario? Write 1-2 short news-style sentences.\n- What recent facts CHALLENGE this scenario? Write 1-2 short news-style sentences.\n\nReturn ONLY valid JSON array:\n[{"index":0,"probability":"low|medium|high","evidence_for":"1-2 news-style facts","evidence_against":"1-2 news-style facts"}]',
+    2048);
+    const ev=pJ(raw);ev.forEach(e=>{const s=sc[e.index];if(!s)return;s.probability=e.probability;s.confirming_signals=e.evidence_for||e.confirming_signals||'';s.invalidating_signals=e.evidence_against||e.invalidating_signals||'';s.last_eval=new Date().toISOString();if(!s.history)s.history=[];s.history.push({d:new Date().toISOString(),p:e.probability==='high'?.85:e.probability==='medium'?.5:.2})});
     DB.set('sc_'+sec.id,sc);renderSc();toast('✓ Re-evaluated');
   }catch(e){toast('⚠ '+e.message)}btn.disabled=false;renderSc()}
 
 async function runPowerShift(){
   if(!DB.get('apiKey'))return toast('⚠');const sec=AS();const uc=UCf(sec.id);if(!uc.length)return toast('No signals');
   const btn=document.getElementById('psBtn');btn.disabled=true;btn.textContent='⟳...';
-  const data=uc.slice(0,15).map(u=>u.co+': '+u.title+' | ↑'+u.psW+' ↓'+u.psL+' | '+u.funnel).join('\n');
-  try{const raw=await ai('Analyze power shifts. Return ONLY valid JSON. Use double quotes for all keys and values.','Sector: '+sec.name+'\nActors: '+POWER_ACTORS.join(', ')+'\n\n'+data+'\n\nReturn: {"actors":[{"name":"string","direction":"gaining|losing|stable","score":-100 to +100,"mechanism":"1 sentence"}],"summary":"2-3 sentences"}',2048);
+  const signalList=uc.slice(0,15).map(u=>u.co+' : '+u.title+' ('+u.ev+')').join('\n');
+  try{const raw=await ai(
+    'You analyze how AI is shifting the balance of power between different types of players in an industry. Write in plain English for executives.',
+    'Sector: '+sec.name+'\n\nThese are the types of players in this sector: '+POWER_ACTORS.join(', ')+'\n\nRecent AI signals:\n'+signalList+'\n\nBased on these signals, who is gaining power and who is losing power? For each player type, give:\n- direction: gaining, losing, or stable\n- score: from -100 (losing a lot) to +100 (gaining a lot)\n- reason: ONE clear sentence explaining why, referencing specific signals\n\nAlso write a 2-sentence summary of the overall power dynamics.\n\nReturn ONLY valid JSON:\n{"actors":[{"name":"player type","direction":"gaining|losing|stable","score":-100 to 100,"reason":"one clear sentence"}],"summary":"2 sentences"}',
+    2048);
     const ps=pJ(raw);DB.set('ps_'+sec.id,ps);renderPS(ps);toast('✓');
   }catch(e){toast('⚠ '+e.message)}btn.disabled=false;btn.textContent='🤖 Analyze'}
 
-// Power Shift — centered horizontal bar chart
+// Qui gagne, qui perd — centered horizontal bar chart
 function renderPS(ps){
   if(!ps?.actors)return;
   const sumEl=document.getElementById('psSummary');
@@ -913,23 +930,18 @@ function renderPS(ps){
   chartEl.innerHTML=sorted.map(a=>{
     const isPos=a.score>=0;const barW=Math.round(Math.abs(a.score)/maxAbs*50);
     const color=isPos?'var(--green)':'var(--red)';
-    return'<div style="display:flex;align-items:center;gap:0;height:32px;margin-bottom:4px">'
-      // Label
+    const reason=a.reason||a.mechanism||'';
+    return'<div style="display:flex;align-items:center;gap:0;height:36px;margin-bottom:4px">'
       +'<div style="width:130px;text-align:right;font-size:12px;font-weight:600;color:var(--ink2);padding-right:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+a.name+'</div>'
-      // Left side (negative)
       +'<div style="width:calc(50% - 65px);display:flex;justify-content:flex-end">'
         +(isPos?'':'<div style="width:'+barW+'%;height:10px;background:'+color+';border-radius:4px 0 0 4px;min-width:4px"></div>')
       +'</div>'
-      // Center line
       +'<div style="width:2px;height:20px;background:var(--border2);flex-shrink:0"></div>'
-      // Right side (positive)
       +'<div style="width:calc(50% - 65px)">'
         +(isPos?'<div style="width:'+barW+'%;height:10px;background:'+color+';border-radius:0 4px 4px 0;min-width:4px"></div>':'')
       +'</div>'
-      // Score
       +'<div style="width:45px;text-align:right;font-size:12px;font-weight:700;color:'+color+';padding-left:8px">'+(isPos?'+':'')+a.score+'</div>'
-      // Mechanism tooltip
-      +'<div style="width:200px;font-size:11px;color:var(--ink3);padding-left:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+(a.mechanism||'')+'">'+(a.mechanism||'')+'</div>'
+      +'<div style="width:220px;font-size:11px;color:var(--ink3);padding-left:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+reason+'">'+reason+'</div>'
     +'</div>';
   }).join('');
 }
@@ -994,7 +1006,7 @@ function showAllUC(){go('pipe');setTimeout(()=>ptab('usecases'),100)}
 
 // ═══ DETAIL PANEL ═══
 function showD(u){if(!u)return;const c=u.conf||0;const cc=c>=.8?'var(--green)':c>=.65?'var(--orange)':'var(--red)';const p=prio(u);
-  document.getElementById('dpC').innerHTML='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">'+evBadge(u.ev)+' <span class="tag">'+u.tech+'</span> '+pilBadge(u)+' '+prioBadge(p)+'</div><div class="dp-title">'+u.title+'</div>'+df('Company',u.co)+df('Type',u.at)+(u.pil?'<div class="dp-lb">Strategic Pillar</div><div class="dp-val">'+(PIL[u.pil]?.i||'')+' '+( PIL[u.pil]?.n||'P'+u.pil)+(u.pilSub?' — '+u.pilSub:'')+'</div>':'')+df('Description',u.desc)+df('Funnel',u.funnel)+(u.psW&&u.psW!=='None'?'<div class="dp-lb">Power Shift</div><div class="dp-val"><span style="color:var(--green)">↑ '+u.psW+'</span>'+(u.psL&&u.psL!=='None'?' · <span style="color:var(--red)">↓ '+u.psL+'</span>':'')+'</div>':'')+'<hr style="border:0;border-top:1px solid var(--border);margin:16px 0"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div style="background:var(--bg);border-radius:10px;padding:12px;text-align:center"><div style="font-family:var(--serif);font-size:22px;color:'+cc+'">'+Math.round(c*100)+'%</div><div style="font-size:11px;color:var(--ink3)">Confidence</div></div><div style="background:var(--bg);border-radius:10px;padding:12px;text-align:center"><div style="font-family:var(--serif);font-size:22px;color:'+(p.lv==='high'?'var(--red)':p.lv==='med'?'var(--orange)':'var(--ink3)')+'">'+p.sc+'</div><div style="font-size:11px;color:var(--ink3)">Priority</div></div></div>'+df('Source',u.src)+'<div class="dp-lb">Article</div><a href="'+u.url+'" target="_blank" style="font-size:12px;color:var(--accent);word-break:break-all">'+(u.url||'—')+'</a>'+df('Date',u.date);
+  document.getElementById('dpC').innerHTML='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">'+evBadge(u.ev)+' <span class="tag">'+u.tech+'</span> '+pilBadge(u)+' '+prioBadge(p)+'</div><div class="dp-title">'+u.title+'</div>'+df('Company',u.co)+df('Type',u.at)+(u.pil?'<div class="dp-lb">Strategic Pillar</div><div class="dp-val">'+(PIL[u.pil]?.i||'')+' '+( PIL[u.pil]?.n||'P'+u.pil)+(u.pilSub?' — '+u.pilSub:'')+'</div>':'')+df('Description',u.desc)+df('Funnel',u.funnel)+(u.psW&&u.psW!=='None'?'<div class="dp-lb">Impact sur le secteur</div><div class="dp-val"><span style="color:var(--green)">↑ '+u.psW+'</span>'+(u.psL&&u.psL!=='None'?' · <span style="color:var(--red)">↓ '+u.psL+'</span>':'')+'</div>':'')+'<hr style="border:0;border-top:1px solid var(--border);margin:16px 0"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div style="background:var(--bg);border-radius:10px;padding:12px;text-align:center"><div style="font-family:var(--serif);font-size:22px;color:'+cc+'">'+Math.round(c*100)+'%</div><div style="font-size:11px;color:var(--ink3)">Confidence</div></div><div style="background:var(--bg);border-radius:10px;padding:12px;text-align:center"><div style="font-family:var(--serif);font-size:22px;color:'+(p.lv==='high'?'var(--red)':p.lv==='med'?'var(--orange)':'var(--ink3)')+'">'+p.sc+'</div><div style="font-size:11px;color:var(--ink3)">Priority</div></div></div>'+df('Source',u.src)+'<div class="dp-lb">Article</div><a href="'+u.url+'" target="_blank" style="font-size:12px;color:var(--accent);word-break:break-all">'+(u.url||'—')+'</a>'+df('Date',u.date);
   document.getElementById('dp').classList.add('on');document.getElementById('ov').classList.add('on');
 }
 function df(l,v){if(!v||v==='null'||v==='—')return'';return'<div class="dp-lb">'+l+'</div><div class="dp-val">'+v+'</div>'}
