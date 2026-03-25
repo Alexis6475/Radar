@@ -362,17 +362,25 @@ hr.div{border:0;border-top:1px solid var(--border);margin:20px 0}
 
   <!-- TAB: Scenarios -->
   <div class="tab-pg" id="itab-scenarios">
-    <div style="display:flex;gap:8px;margin-bottom:16px;justify-content:flex-end">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div id="scHeadline" style="font-family:var(--serif);font-size:18px;color:var(--ink);line-height:1.3"></div>
       <button class="btn btn-s" onclick="scenarioAction()" id="scActionBtn">🎯 Generate Scenarios</button>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;margin-bottom:24px" id="scList"></div>
-    <!-- Power Shift -->
+
+    <!-- Leaderboard -->
+    <div class="card" style="margin-bottom:20px;padding:0;overflow:hidden">
+      <div style="padding:16px 24px 8px"><div class="card-t" style="margin-bottom:0">🏁 Scenario Race</div></div>
+      <div id="scLeaderboard" style="padding:0 24px 20px"></div>
+    </div>
+
+    <!-- Power Shift — bar chart -->
     <div class="card" style="margin-bottom:20px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-        <div class="card-t" style="margin-bottom:0">⚖️ Power Shift Analysis</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+        <div class="card-t" style="margin-bottom:0">⚖️ Power Shift</div>
         <button class="btn btn-s" onclick="runPowerShift()" id="psBtn" style="font-size:12px">🤖 Analyze</button>
       </div>
-      <div id="psContent"><div style="color:var(--ink3);font-size:13px;text-align:center;padding:20px">Click Analyze to generate</div></div>
+      <div id="psSummary" style="font-size:13px;color:var(--ink2);line-height:1.7;margin-bottom:16px"></div>
+      <div id="psChart"></div>
     </div>
   </div>
 
@@ -792,18 +800,84 @@ function renderTechMatrix(sid){
   el.innerHTML='<div style="position:absolute;inset:0;padding:8px 0"><div style="display:flex;gap:12px;margin-bottom:14px;padding-left:130px">'+mats.map(m=>'<div style="display:flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--ink3)"><span style="width:11px;height:11px;border-radius:3px;background:'+mc[m]+'"></span>'+m+'</div>').join('')+'</div>'+techs.map(([tech,ucs])=>{const ct={};ucs.forEach(u=>{ct[u.ev]=(ct[u.ev]||0)+1});return'<div style="display:flex;align-items:center;gap:10px;height:32px;margin-bottom:6px"><div style="width:120px;text-align:right;font-size:12px;font-weight:600;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+tech+'</div><div style="flex:1;display:flex;height:22px;border-radius:5px;overflow:hidden;background:var(--bg)">'+mats.map(m=>{const n=ct[m]||0;return n?'<div style="width:'+(n/mx*100)+'%;background:'+mc[m]+';display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:white;min-width:16px">'+(n>1?n:'')+'</div>':''}).join('')+'</div><div style="width:28px;text-align:right;font-size:12px;font-weight:700;color:var(--ink3)">'+ucs.length+'</div></div>'}).join('')+'</div>';
 }
 
-// Scenarios
+// Scenarios — Leaderboard design
 function renderSc(){
   const sec=AS();const scenarios=SCEN(sec.id);
-  // Update button label
   const btn=document.getElementById('scActionBtn');
-  if(btn){if(scenarios.length){btn.textContent='🤖 Re-evaluate against latest signals';btn.onclick=evalScenarios}else{btn.textContent='🎯 Generate Scenarios';btn.onclick=genScenarios}}
-  if(!scenarios.length){document.getElementById('scList').innerHTML='<div class="empty" style="grid-column:1/-1"><div class="empty-i">🎯</div><div class="empty-t">No scenarios</div><div class="empty-s">Generate 2-3 forward-looking scenarios based on your signals</div></div>';return}
-  const cols=['#dc2626','#2563eb','#16a34a','#ea580c'];
-  document.getElementById('scList').innerHTML=scenarios.map((s,i)=>{const pp=s.probability==='high'?85:s.probability==='medium'?50:20;
-    return'<div class="sc-card"><div style="position:absolute;top:0;left:0;right:0;height:3px;background:'+cols[i%4]+'"></div><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><span class="sc-prob '+s.probability+'">'+(s.probability==='high'?'🔴 High':s.probability==='medium'?'🟠 Medium':'⚪ Low')+'</span><span style="font-size:11px;color:var(--ink4)">'+(s.last_eval?new Date(s.last_eval).toLocaleDateString():'—')+'</span></div><div style="font-family:var(--serif);font-size:16px;margin-bottom:8px">'+s.name+'</div><div style="font-size:13px;color:var(--ink2);line-height:1.6;margin-bottom:10px">'+s.description+'</div><div style="font-size:11px;font-weight:600;color:var(--ink3);margin-bottom:4px">DRIVERS</div><div style="font-size:12px;color:var(--ink2);margin-bottom:10px">'+(s.drivers||[]).join(' · ')+'</div><div class="sc-bar"><div class="sc-fill" style="width:'+pp+'%;background:'+cols[i%4]+'"></div></div><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--ink3)"><span>↑ <strong style="color:var(--green)">'+(s.winners||[]).join(', ')+'</strong></span><span>↓ <strong style="color:var(--red)">'+(s.losers||[]).join(', ')+'</strong></span></div>'+(s.confirming_signals?'<div style="margin-top:8px;font-size:11px;color:var(--accent)">✅ '+s.confirming_signals+'</div>':'')+(s.invalidating_signals?'<div style="margin-top:4px;font-size:11px;color:var(--red)">❌ '+s.invalidating_signals+'</div>':'')+'</div>'}).join('');
+  const headline=document.getElementById('scHeadline');
+  const lb=document.getElementById('scLeaderboard');
+  if(btn){if(scenarios.length){btn.textContent='🤖 Re-evaluate';btn.onclick=evalScenarios}else{btn.textContent='🎯 Generate Scenarios';btn.onclick=genScenarios}}
+  if(!scenarios.length){
+    if(headline)headline.innerHTML='';
+    lb.innerHTML='<div style="text-align:center;padding:40px;color:var(--ink3)"><div style="font-size:36px;margin-bottom:12px">🎯</div><div style="font-size:14px;font-weight:600;color:var(--ink2);margin-bottom:4px">No scenarios yet</div><div style="font-size:13px">Generate 2-3 forward-looking scenarios from your signals</div></div>';
+    return;
+  }
+  // Sort by probability
+  const probVal=s=>s.probability==='high'?3:s.probability==='medium'?2:1;
+  const sorted=[...scenarios].sort((a,b)=>probVal(b)-probVal(a));
+  window._scenarios=sorted;
+  // Headline
+  const leader=sorted[0];
+  if(headline)headline.innerHTML='🏁 <strong>'+leader.name+'</strong> leads'+(leader.confirming_signals?' — '+leader.confirming_signals.split(';')[0].trim().slice(0,60):'');
+  // Leaderboard rows
+  const probPct=s=>s.probability==='high'?85:s.probability==='medium'?50:20;
+  const probColor=s=>s.probability==='high'?'var(--red)':s.probability==='medium'?'var(--orange)':'var(--ink4)';
+  const probLabel=s=>s.probability==='high'?'High likelihood':s.probability==='medium'?'Medium likelihood':'Low likelihood';
+  const deltaIcon=s=>{if(!s.history||s.history.length<2)return'<span style="color:var(--ink4)">— New</span>';const prev=s.history[s.history.length-2].p;const cur=s.history[s.history.length-1].p;if(cur>prev)return'<span style="color:var(--green);font-weight:700">↑ Strengthened</span>';if(cur<prev)return'<span style="color:var(--red);font-weight:700">↓ Weakened</span>';return'<span style="color:var(--ink4)">→ Stable</span>'};
+  // Sparkline
+  function sparkSVG(history,color){if(!history||history.length<3)return'';const pts=history.slice(-8);const mx=Math.max(...pts.map(p=>p.p),0.01);const w=64;const h=20;const step=w/(pts.length-1);const d=pts.map((p,i)=>(i===0?'M':'L')+(i*step).toFixed(1)+','+(h-p.p/mx*h).toFixed(1)).join(' ');return'<svg width="'+w+'" height="'+h+'" style="flex-shrink:0"><path d="'+d+'" fill="none" stroke="'+color+'" stroke-width="2" stroke-linecap="round"/></svg>'}
+
+  lb.innerHTML=sorted.map((s,i)=>{
+    const pp=probPct(s);const pc=probColor(s);
+    return'<div style="display:flex;align-items:center;gap:16px;padding:16px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="showScDetail('+i+')">'
+      // Rank
+      +'<div style="font-family:var(--serif);font-size:26px;color:var(--ink4);width:28px;text-align:center;flex-shrink:0">'+(i+1)+'</div>'
+      // Main content
+      +'<div style="flex:1;min-width:0">'
+        +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">'
+          +'<div style="font-size:14px;font-weight:700;color:var(--ink)">'+s.name+'</div>'
+          +'<div style="font-size:12px">'+deltaIcon(s)+'</div>'
+        +'</div>'
+        // Confirming signal (1 line)
+        +(s.confirming_signals?'<div style="font-size:12px;color:var(--green);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:500px">✅ '+s.confirming_signals+'</div>':'')
+        +(s.invalidating_signals?'<div style="font-size:12px;color:var(--red);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:500px;margin-top:2px">❌ '+s.invalidating_signals+'</div>':'')
+      +'</div>'
+      // Sparkline
+      +'<div style="flex-shrink:0">'+sparkSVG(s.history,pc)+'</div>'
+      // Probability bar
+      +'<div style="width:140px;flex-shrink:0">'
+        +'<div style="display:flex;align-items:center;gap:8px">'
+          +'<div style="flex:1;height:8px;background:var(--bg);border-radius:4px;overflow:hidden"><div style="width:'+pp+'%;height:100%;background:'+pc+';border-radius:4px;transition:width 0.5s"></div></div>'
+          +'<span style="font-size:12px;font-weight:700;color:'+pc+';min-width:30px;text-align:right">'+pp+'%</span>'
+        +'</div>'
+        +'<div style="font-size:10px;color:var(--ink4);margin-top:2px;text-align:right">'+probLabel(s)+'</div>'
+      +'</div>'
+      // Arrow
+      +'<div style="font-size:14px;color:var(--ink4);flex-shrink:0">→</div>'
+    +'</div>';
+  }).join('');
+
+  // Power shift
   const ps=PS(sec.id);if(ps)renderPS(ps);
 }
+// Scenario detail in side panel
+function showScDetail(i){
+  const s=window._scenarios[i];if(!s)return;
+  const probColor=s.probability==='high'?'var(--red)':s.probability==='medium'?'var(--orange)':'var(--ink4)';
+  document.getElementById('dpC').innerHTML=
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><span style="display:inline-flex;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;background:rgba(0,0,0,0.04);color:'+probColor+'">'+s.probability.toUpperCase()+' LIKELIHOOD</span>'+(s.last_eval?'<span style="font-size:11px;color:var(--ink4)">Eval: '+new Date(s.last_eval).toLocaleDateString()+'</span>':'')+'</div>'
+    +'<div class="dp-title">'+s.name+'</div>'
+    +'<div style="font-size:14px;color:var(--ink2);line-height:1.7;margin-bottom:20px">'+s.description+'</div>'
+    +'<div class="dp-lb">Key Drivers</div><div class="dp-val" style="margin-bottom:16px">'+(s.drivers||[]).map(d=>'<div style="padding:4px 0;border-bottom:1px solid var(--border);font-size:13px">'+d+'</div>').join('')+'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">'
+      +'<div style="background:rgba(22,163,74,0.04);border-radius:10px;padding:12px"><div style="font-size:10px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">↑ Winners</div>'+(s.winners||[]).map(w=>'<div style="font-size:13px;font-weight:500;padding:2px 0">'+w+'</div>').join('')+'</div>'
+      +'<div style="background:rgba(220,38,38,0.04);border-radius:10px;padding:12px"><div style="font-size:10px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">↓ Losers</div>'+(s.losers||[]).map(l=>'<div style="font-size:13px;font-weight:500;padding:2px 0">'+l+'</div>').join('')+'</div>'
+    +'</div>'
+    +(s.confirming_signals?'<div class="dp-lb">Confirming Signals</div><div style="font-size:13px;color:var(--green);line-height:1.6;margin-bottom:12px">'+s.confirming_signals+'</div>':'')
+    +(s.invalidating_signals?'<div class="dp-lb">Challenging Signals</div><div style="font-size:13px;color:var(--red);line-height:1.6;margin-bottom:12px">'+s.invalidating_signals+'</div>':'');
+  document.getElementById('dp').classList.add('on');document.getElementById('ov').classList.add('on');
+}
+
 function scenarioAction(){const sec=AS();if(SCEN(sec.id).length)evalScenarios();else genScenarios()}
 async function genScenarios(){
   if(!DB.get('apiKey'))return toast('⚠ Key needed');const sec=AS();const uc=UCf(sec.id);if(!uc.length)return toast('Run pipeline first');
@@ -827,9 +901,38 @@ async function runPowerShift(){
   try{const raw=await ai('Analyze power shifts. Return ONLY valid JSON. Use double quotes for all keys and values.','Sector: '+sec.name+'\nActors: '+POWER_ACTORS.join(', ')+'\n\n'+data+'\n\nReturn: {"actors":[{"name":"string","direction":"gaining|losing|stable","score":-100 to +100,"mechanism":"1 sentence"}],"summary":"2-3 sentences"}',2048);
     const ps=pJ(raw);DB.set('ps_'+sec.id,ps);renderPS(ps);toast('✓');
   }catch(e){toast('⚠ '+e.message)}btn.disabled=false;btn.textContent='🤖 Analyze'}
+
+// Power Shift — centered horizontal bar chart
 function renderPS(ps){
-  const el=document.getElementById('psContent');if(!ps?.actors)return;
-  el.innerHTML='<div style="font-size:13px;color:var(--ink2);line-height:1.7;margin-bottom:16px;background:rgba(37,99,235,0.04);border-left:3px solid var(--accent);padding:12px 16px;border-radius:0 8px 8px 0">'+(ps.summary||'')+'</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px">'+ [...ps.actors].sort((a,b)=>b.score-a.score).map(a=>{const arr=a.direction==='gaining'?'↑':a.direction==='losing'?'↓':'→';const c=a.direction==='gaining'?'var(--green)':a.direction==='losing'?'var(--red)':'var(--ink4)';return'<div class="pw-card"><div class="pw-arrow" style="color:'+c+'">'+arr+'</div><div style="flex:1"><div style="font-size:13px;font-weight:700">'+a.name+'</div><div style="font-size:11px;color:var(--ink3);margin-top:2px">'+(a.mechanism||'')+'</div><div style="display:flex;align-items:center;gap:6px;margin-top:6px"><div style="flex:1;height:4px;background:var(--bg);border-radius:2px;overflow:hidden"><div style="width:'+Math.abs(a.score)+'%;height:100%;background:'+c+';border-radius:2px"></div></div><span style="font-size:11px;font-weight:700;color:'+c+'">'+(a.score>0?'+':'')+a.score+'</span></div></div></div>'}).join('')+'</div>';}
+  if(!ps?.actors)return;
+  const sumEl=document.getElementById('psSummary');
+  const chartEl=document.getElementById('psChart');
+  if(sumEl)sumEl.innerHTML=ps.summary||'';
+  const sorted=[...ps.actors].sort((a,b)=>b.score-a.score);
+  const maxAbs=Math.max(...sorted.map(a=>Math.abs(a.score)),1);
+  chartEl.innerHTML=sorted.map(a=>{
+    const isPos=a.score>=0;const barW=Math.round(Math.abs(a.score)/maxAbs*50);
+    const color=isPos?'var(--green)':'var(--red)';
+    return'<div style="display:flex;align-items:center;gap:0;height:32px;margin-bottom:4px">'
+      // Label
+      +'<div style="width:130px;text-align:right;font-size:12px;font-weight:600;color:var(--ink2);padding-right:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+a.name+'</div>'
+      // Left side (negative)
+      +'<div style="width:calc(50% - 65px);display:flex;justify-content:flex-end">'
+        +(isPos?'':'<div style="width:'+barW+'%;height:10px;background:'+color+';border-radius:4px 0 0 4px;min-width:4px"></div>')
+      +'</div>'
+      // Center line
+      +'<div style="width:2px;height:20px;background:var(--border2);flex-shrink:0"></div>'
+      // Right side (positive)
+      +'<div style="width:calc(50% - 65px)">'
+        +(isPos?'<div style="width:'+barW+'%;height:10px;background:'+color+';border-radius:0 4px 4px 0;min-width:4px"></div>':'')
+      +'</div>'
+      // Score
+      +'<div style="width:45px;text-align:right;font-size:12px;font-weight:700;color:'+color+';padding-left:8px">'+(isPos?'+':'')+a.score+'</div>'
+      // Mechanism tooltip
+      +'<div style="width:200px;font-size:11px;color:var(--ink3);padding-left:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+(a.mechanism||'')+'">'+(a.mechanism||'')+'</div>'
+    +'</div>';
+  }).join('');
+}
 
 // Heatmap
 function renderHeatmap(){
