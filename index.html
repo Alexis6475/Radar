@@ -589,22 +589,28 @@ const mark=url=>{const s=DB.get('seen')||{};s[url]=Date.now();DB.set('seen',s)};
 const sl=ms=>new Promise(r=>setTimeout(r,ms));
 
 // ═══ AI ═══
-async function ai(sys,usr){const key=DB.get('apiKey');const model=DB.get('model')||'claude-haiku-4-5-20251001';const prov=DB.get('apiProvider')||(key?.startsWith('sk-ant')?'anthropic':'openai');if(prov==='openai'){const r=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model,max_tokens:1024,messages:[{role:'system',content:sys},{role:'user',content:usr}]})});if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e?.error?.message||'API '+r.status)}return(await r.json()).choices[0].message.content.trim()}else{const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model,max_tokens:1024,system:sys,messages:[{role:'user',content:usr}]})});if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e?.error?.message||'API '+r.status)}return(await r.json()).content[0].text.trim()}}
+async function ai(sys,usr,maxTok){const key=DB.get('apiKey');const model=DB.get('model')||'claude-haiku-4-5-20251001';const prov=DB.get('apiProvider')||(key?.startsWith('sk-ant')?'anthropic':'openai');const mt=maxTok||1024;if(prov==='openai'){const r=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model,max_tokens:mt,messages:[{role:'system',content:sys},{role:'user',content:usr}]})});if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e?.error?.message||'API '+r.status)}return(await r.json()).choices[0].message.content.trim()}else{const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model,max_tokens:mt,system:sys,messages:[{role:'user',content:usr}]})});if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e?.error?.message||'API '+r.status)}return(await r.json()).content[0].text.trim()}}
 function pJ(t){
   t=t.trim();
   // Strip markdown fences
   if(t.startsWith('```'))t=t.replace(/^```[\w]*\n?/,'').replace(/\n?```$/,'');
   t=t.trim();
-  // Extract JSON if wrapped in text
+  // Extract JSON block if wrapped in text
   const jMatch=t.match(/(\[[\s\S]*\]|\{[\s\S]*\})/);
   if(jMatch)t=jMatch[1];
-  // Fix unquoted property names: word: → "word":
-  t=t.replace(/([{,]\s*)(\w+)\s*:/g,'$1"$2":');
-  // Fix single quotes to double quotes (but not inside strings)
-  t=t.replace(/'/g,'"');
-  // Fix trailing commas
-  t=t.replace(/,\s*([}\]])/g,'$1');
-  return JSON.parse(t);
+  // Try parsing as-is first
+  try{return JSON.parse(t)}catch(e1){
+    // Fix trailing commas
+    let fixed=t.replace(/,\s*([}\]])/g,'$1');
+    try{return JSON.parse(fixed)}catch(e2){
+      // Fix unquoted property names
+      fixed=fixed.replace(/([{,]\s*)([a-zA-Z_]\w*)\s*:/g,'$1"$2":');
+      try{return JSON.parse(fixed)}catch(e3){
+        // Last resort: try to fix the specific position mentioned in error
+        throw e3;
+      }
+    }
+  }
 }
 
 // ═══ EXTRACTION PROMPTS (V4 with pillars) ═══
@@ -802,14 +808,14 @@ function scenarioAction(){const sec=AS();if(SCEN(sec.id).length)evalScenarios();
 async function genScenarios(){
   if(!DB.get('apiKey'))return toast('⚠ Key needed');const sec=AS();const uc=UCf(sec.id);if(!uc.length)return toast('Run pipeline first');
   const btn=document.getElementById('scActionBtn');btn.disabled=true;btn.textContent='⟳ Generating...';
-  try{const raw=await ai('Build 2-3 market scenarios. Return ONLY a valid JSON array. Use double quotes for all property names and string values.','Sector: '+sec.name+'\nTheme: '+(sec.tracker?.theme||'')+'\nSignals:\n'+uc.slice(0,15).map(u=>u.co+': '+u.title+' ('+u.ev+', P'+u.pil+')').join('\n')+'\n\nActors: '+POWER_ACTORS.join(', ')+'\n\nReturn: [{"name":"string","description":"2-3 sentences","drivers":["3-4"],"winners":["who"],"losers":["who"],"probability":"low|medium|high","confirming_signals":"what confirms","invalidating_signals":"what invalidates"}]');
+  try{const raw=await ai('Build 2-3 market scenarios. Return ONLY a valid JSON array. Use double quotes for all property names and string values. Do NOT use apostrophes inside strings — rephrase instead.','Sector: '+sec.name+'\nTheme: '+(sec.tracker?.theme||'')+'\nSignals:\n'+uc.slice(0,15).map(u=>u.co+': '+u.title+' ('+u.ev+', P'+u.pil+')').join('\n')+'\n\nActors: '+POWER_ACTORS.join(', ')+'\n\nReturn: [{"name":"string","description":"2-3 sentences","drivers":["3-4"],"winners":["who"],"losers":["who"],"probability":"low|medium|high","confirming_signals":"what confirms","invalidating_signals":"what invalidates"}]',2048);
     const sc=pJ(raw);sc.forEach(s=>{s.created=new Date().toISOString();s.last_eval=new Date().toISOString();s.history=[{d:new Date().toISOString(),p:s.probability==='high'?.85:s.probability==='medium'?.5:.2}]});
     DB.set('sc_'+sec.id,sc);renderSc();toast('✓ '+sc.length+' scenarios');
   }catch(e){toast('⚠ '+e.message)}btn.disabled=false;renderSc()}
 async function evalScenarios(){
   if(!DB.get('apiKey'))return toast('⚠');const sec=AS();const sc=SCEN(sec.id);const uc=UCf(sec.id);if(!sc.length||!uc.length)return toast('Need scenarios + data');
   const btn=document.getElementById('scActionBtn');btn.disabled=true;btn.textContent='⟳ Re-evaluating...';
-  try{const raw=await ai('Evaluate scenarios against signals. Return ONLY a valid JSON array. Use double quotes for all property names.','Scenarios:\n'+sc.map((s,i)=>(i+1)+'. '+s.name+' ('+s.probability+')').join('\n')+'\n\nLatest:\n'+uc.slice(0,12).map(u=>u.co+': '+u.title+' ('+u.ev+', P'+u.pil+')').join('\n')+'\n\nReturn: [{"index":0,"probability":"low|medium|high","confirming_signals":"string","invalidating_signals":"string"}]');
+  try{const raw=await ai('Evaluate scenarios against signals. Return ONLY a valid JSON array. Use double quotes for all property names. No apostrophes in strings.','Scenarios:\n'+sc.map((s,i)=>(i+1)+'. '+s.name+' ('+s.probability+')').join('\n')+'\n\nLatest:\n'+uc.slice(0,12).map(u=>u.co+': '+u.title+' ('+u.ev+', P'+u.pil+')').join('\n')+'\n\nReturn: [{"index":0,"probability":"low|medium|high","confirming_signals":"string","invalidating_signals":"string"}]',2048);
     const ev=pJ(raw);ev.forEach(e=>{const s=sc[e.index];if(!s)return;s.probability=e.probability;s.confirming_signals=e.confirming_signals;s.invalidating_signals=e.invalidating_signals;s.last_eval=new Date().toISOString();if(!s.history)s.history=[];s.history.push({d:new Date().toISOString(),p:e.probability==='high'?.85:e.probability==='medium'?.5:.2})});
     DB.set('sc_'+sec.id,sc);renderSc();toast('✓ Re-evaluated');
   }catch(e){toast('⚠ '+e.message)}btn.disabled=false;renderSc()}
@@ -818,7 +824,7 @@ async function runPowerShift(){
   if(!DB.get('apiKey'))return toast('⚠');const sec=AS();const uc=UCf(sec.id);if(!uc.length)return toast('No signals');
   const btn=document.getElementById('psBtn');btn.disabled=true;btn.textContent='⟳...';
   const data=uc.slice(0,15).map(u=>u.co+': '+u.title+' | ↑'+u.psW+' ↓'+u.psL+' | '+u.funnel).join('\n');
-  try{const raw=await ai('Analyze power shifts. ONLY JSON.','Sector: '+sec.name+'\nActors: '+POWER_ACTORS.join(', ')+'\n\n'+data+'\n\nReturn: {"actors":[{"name":"string","direction":"gaining|losing|stable","score":-100 to +100,"mechanism":"1 sentence"}],"summary":"2-3 sentences"}');
+  try{const raw=await ai('Analyze power shifts. Return ONLY valid JSON. Use double quotes for all keys and values.','Sector: '+sec.name+'\nActors: '+POWER_ACTORS.join(', ')+'\n\n'+data+'\n\nReturn: {"actors":[{"name":"string","direction":"gaining|losing|stable","score":-100 to +100,"mechanism":"1 sentence"}],"summary":"2-3 sentences"}',2048);
     const ps=pJ(raw);DB.set('ps_'+sec.id,ps);renderPS(ps);toast('✓');
   }catch(e){toast('⚠ '+e.message)}btn.disabled=false;btn.textContent='🤖 Analyze'}
 function renderPS(ps){
