@@ -363,8 +363,7 @@ hr.div{border:0;border-top:1px solid var(--border);margin:20px 0}
   <!-- TAB: Scenarios -->
   <div class="tab-pg" id="itab-scenarios">
     <div style="display:flex;gap:8px;margin-bottom:16px;justify-content:flex-end">
-      <button class="btn btn-s" onclick="evalScenarios()" id="evalScBtn">🤖 Re-evaluate</button>
-      <button class="btn btn-p" onclick="genScenarios()" id="genScBtn">✨ Generate Scenarios</button>
+      <button class="btn btn-s" onclick="scenarioAction()" id="scActionBtn">🎯 Generate Scenarios</button>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;margin-bottom:24px" id="scList"></div>
     <!-- Power Shift -->
@@ -591,7 +590,22 @@ const sl=ms=>new Promise(r=>setTimeout(r,ms));
 
 // ═══ AI ═══
 async function ai(sys,usr){const key=DB.get('apiKey');const model=DB.get('model')||'claude-haiku-4-5-20251001';const prov=DB.get('apiProvider')||(key?.startsWith('sk-ant')?'anthropic':'openai');if(prov==='openai'){const r=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model,max_tokens:1024,messages:[{role:'system',content:sys},{role:'user',content:usr}]})});if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e?.error?.message||'API '+r.status)}return(await r.json()).choices[0].message.content.trim()}else{const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model,max_tokens:1024,system:sys,messages:[{role:'user',content:usr}]})});if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e?.error?.message||'API '+r.status)}return(await r.json()).content[0].text.trim()}}
-function pJ(t){t=t.trim();if(t.startsWith('```'))t=t.split('\n').slice(1,-1).join('\n');return JSON.parse(t)}
+function pJ(t){
+  t=t.trim();
+  // Strip markdown fences
+  if(t.startsWith('```'))t=t.replace(/^```[\w]*\n?/,'').replace(/\n?```$/,'');
+  t=t.trim();
+  // Extract JSON if wrapped in text
+  const jMatch=t.match(/(\[[\s\S]*\]|\{[\s\S]*\})/);
+  if(jMatch)t=jMatch[1];
+  // Fix unquoted property names: word: → "word":
+  t=t.replace(/([{,]\s*)(\w+)\s*:/g,'$1"$2":');
+  // Fix single quotes to double quotes (but not inside strings)
+  t=t.replace(/'/g,'"');
+  // Fix trailing commas
+  t=t.replace(/,\s*([}\]])/g,'$1');
+  return JSON.parse(t);
+}
 
 // ═══ EXTRACTION PROMPTS (V4 with pillars) ═══
 function qSys(sec){return'You determine if an article matches: "'+( sec.tracker?.theme||'Find signals')+'"\nACCEPT if it names a SPECIFIC company doing something concrete.\nRESPOND ONLY JSON: {"is_relevant":true|false,"confidence":0.0-1.0}'}
@@ -775,27 +789,30 @@ function renderTechMatrix(sid){
 // Scenarios
 function renderSc(){
   const sec=AS();const scenarios=SCEN(sec.id);
+  // Update button label
+  const btn=document.getElementById('scActionBtn');
+  if(btn){if(scenarios.length){btn.textContent='🤖 Re-evaluate against latest signals';btn.onclick=evalScenarios}else{btn.textContent='🎯 Generate Scenarios';btn.onclick=genScenarios}}
   if(!scenarios.length){document.getElementById('scList').innerHTML='<div class="empty" style="grid-column:1/-1"><div class="empty-i">🎯</div><div class="empty-t">No scenarios</div><div class="empty-s">Generate 2-3 forward-looking scenarios based on your signals</div></div>';return}
   const cols=['#dc2626','#2563eb','#16a34a','#ea580c'];
   document.getElementById('scList').innerHTML=scenarios.map((s,i)=>{const pp=s.probability==='high'?85:s.probability==='medium'?50:20;
     return'<div class="sc-card"><div style="position:absolute;top:0;left:0;right:0;height:3px;background:'+cols[i%4]+'"></div><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><span class="sc-prob '+s.probability+'">'+(s.probability==='high'?'🔴 High':s.probability==='medium'?'🟠 Medium':'⚪ Low')+'</span><span style="font-size:11px;color:var(--ink4)">'+(s.last_eval?new Date(s.last_eval).toLocaleDateString():'—')+'</span></div><div style="font-family:var(--serif);font-size:16px;margin-bottom:8px">'+s.name+'</div><div style="font-size:13px;color:var(--ink2);line-height:1.6;margin-bottom:10px">'+s.description+'</div><div style="font-size:11px;font-weight:600;color:var(--ink3);margin-bottom:4px">DRIVERS</div><div style="font-size:12px;color:var(--ink2);margin-bottom:10px">'+(s.drivers||[]).join(' · ')+'</div><div class="sc-bar"><div class="sc-fill" style="width:'+pp+'%;background:'+cols[i%4]+'"></div></div><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--ink3)"><span>↑ <strong style="color:var(--green)">'+(s.winners||[]).join(', ')+'</strong></span><span>↓ <strong style="color:var(--red)">'+(s.losers||[]).join(', ')+'</strong></span></div>'+(s.confirming_signals?'<div style="margin-top:8px;font-size:11px;color:var(--accent)">✅ '+s.confirming_signals+'</div>':'')+(s.invalidating_signals?'<div style="margin-top:4px;font-size:11px;color:var(--red)">❌ '+s.invalidating_signals+'</div>':'')+'</div>'}).join('');
-  // Power shift
   const ps=PS(sec.id);if(ps)renderPS(ps);
 }
+function scenarioAction(){const sec=AS();if(SCEN(sec.id).length)evalScenarios();else genScenarios()}
 async function genScenarios(){
   if(!DB.get('apiKey'))return toast('⚠ Key needed');const sec=AS();const uc=UCf(sec.id);if(!uc.length)return toast('Run pipeline first');
-  const btn=document.getElementById('genScBtn');btn.disabled=true;btn.textContent='⟳...';
-  try{const raw=await ai('Build 2-3 market scenarios. ONLY JSON array.','Sector: '+sec.name+'\nTheme: '+(sec.tracker?.theme||'')+'\nSignals:\n'+uc.slice(0,15).map(u=>u.co+': '+u.title+' ('+u.ev+', P'+u.pil+')').join('\n')+'\n\nActors: '+POWER_ACTORS.join(', ')+'\n\nReturn: [{"name":"string","description":"2-3 sentences","drivers":["3-4"],"winners":["who"],"losers":["who"],"probability":"low|medium|high","confirming_signals":"what confirms","invalidating_signals":"what invalidates"}]');
+  const btn=document.getElementById('scActionBtn');btn.disabled=true;btn.textContent='⟳ Generating...';
+  try{const raw=await ai('Build 2-3 market scenarios. Return ONLY a valid JSON array. Use double quotes for all property names and string values.','Sector: '+sec.name+'\nTheme: '+(sec.tracker?.theme||'')+'\nSignals:\n'+uc.slice(0,15).map(u=>u.co+': '+u.title+' ('+u.ev+', P'+u.pil+')').join('\n')+'\n\nActors: '+POWER_ACTORS.join(', ')+'\n\nReturn: [{"name":"string","description":"2-3 sentences","drivers":["3-4"],"winners":["who"],"losers":["who"],"probability":"low|medium|high","confirming_signals":"what confirms","invalidating_signals":"what invalidates"}]');
     const sc=pJ(raw);sc.forEach(s=>{s.created=new Date().toISOString();s.last_eval=new Date().toISOString();s.history=[{d:new Date().toISOString(),p:s.probability==='high'?.85:s.probability==='medium'?.5:.2}]});
     DB.set('sc_'+sec.id,sc);renderSc();toast('✓ '+sc.length+' scenarios');
-  }catch(e){toast('⚠ '+e.message)}btn.disabled=false;btn.textContent='✨ Generate Scenarios'}
+  }catch(e){toast('⚠ '+e.message)}btn.disabled=false;renderSc()}
 async function evalScenarios(){
   if(!DB.get('apiKey'))return toast('⚠');const sec=AS();const sc=SCEN(sec.id);const uc=UCf(sec.id);if(!sc.length||!uc.length)return toast('Need scenarios + data');
-  const btn=document.getElementById('evalScBtn');btn.disabled=true;btn.textContent='⟳...';
-  try{const raw=await ai('Evaluate scenarios against signals. ONLY JSON array.','Scenarios:\n'+sc.map((s,i)=>(i+1)+'. '+s.name+' ('+s.probability+')').join('\n')+'\n\nLatest:\n'+uc.slice(0,12).map(u=>u.co+': '+u.title+' ('+u.ev+', P'+u.pil+')').join('\n')+'\n\nReturn: [{"index":0-based,"probability":"low|medium|high","confirming_signals":"string","invalidating_signals":"string"}]');
+  const btn=document.getElementById('scActionBtn');btn.disabled=true;btn.textContent='⟳ Re-evaluating...';
+  try{const raw=await ai('Evaluate scenarios against signals. Return ONLY a valid JSON array. Use double quotes for all property names.','Scenarios:\n'+sc.map((s,i)=>(i+1)+'. '+s.name+' ('+s.probability+')').join('\n')+'\n\nLatest:\n'+uc.slice(0,12).map(u=>u.co+': '+u.title+' ('+u.ev+', P'+u.pil+')').join('\n')+'\n\nReturn: [{"index":0,"probability":"low|medium|high","confirming_signals":"string","invalidating_signals":"string"}]');
     const ev=pJ(raw);ev.forEach(e=>{const s=sc[e.index];if(!s)return;s.probability=e.probability;s.confirming_signals=e.confirming_signals;s.invalidating_signals=e.invalidating_signals;s.last_eval=new Date().toISOString();if(!s.history)s.history=[];s.history.push({d:new Date().toISOString(),p:e.probability==='high'?.85:e.probability==='medium'?.5:.2})});
     DB.set('sc_'+sec.id,sc);renderSc();toast('✓ Re-evaluated');
-  }catch(e){toast('⚠ '+e.message)}btn.disabled=false;btn.textContent='🤖 Re-evaluate'}
+  }catch(e){toast('⚠ '+e.message)}btn.disabled=false;renderSc()}
 
 async function runPowerShift(){
   if(!DB.get('apiKey'))return toast('⚠');const sec=AS();const uc=UCf(sec.id);if(!uc.length)return toast('No signals');
