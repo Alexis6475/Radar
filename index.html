@@ -336,6 +336,7 @@ hr.div{border:0;border-top:1px solid var(--border);margin:20px 0}
     <button class="tab on" onclick="itab('companies')">🏢 Companies</button>
     <button class="tab" onclick="itab('trends')">📈 Trends</button>
     <button class="tab" onclick="itab('scenarios')">🎯 Scenarios</button>
+    <button class="tab" onclick="itab('testsc')">🧪 Test Scenarios</button>
     <button class="tab" onclick="itab('heatmap')">🔥 Heatmap</button>
   </div>
 
@@ -360,32 +361,73 @@ hr.div{border:0;border-top:1px solid var(--border);margin:20px 0}
     <div class="card"><div class="card-t">📊 Tech × Maturity Matrix</div><div id="radarChart" style="position:relative;width:100%;min-height:200px"></div></div>
   </div>
 
-  <!-- TAB: Scenarios -->
+  <!-- TAB: Scenarios (REDESIGNED) -->
   <div class="tab-pg" id="itab-scenarios">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
-      <div id="scHeadline" style="font-family:var(--serif);font-size:18px;color:var(--ink);line-height:1.3"></div>
-      <div style="display:flex;gap:6px;align-items:center">
+    <!-- Controls -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <!-- View toggle: Scenarios vs Actors -->
+        <div class="vtog">
+          <button class="vbtn on" id="scViewSc" onclick="setScView('scenarios')">📊 Scenarios</button>
+          <button class="vbtn" id="scViewAc" onclick="setScView('actors')">⚖️ Actors</button>
+        </div>
         <span id="scDataInfo" style="font-size:11px;color:var(--ink4)"></span>
-        <button class="btn btn-g" onclick="regenScenarios()" id="scRegenBtn" style="font-size:12px;display:none">↻ Regenerate from all data</button>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-g" onclick="regenScenarios()" id="scRegenBtn" style="font-size:12px;display:none">↻ Regenerate</button>
         <button class="btn btn-s" onclick="scenarioAction()" id="scActionBtn">🎯 Generate Scenarios</button>
       </div>
     </div>
 
-    <!-- Leaderboard -->
+    <!-- BLOC 1: Evolution Graph (SVG) -->
     <div class="card" style="margin-bottom:20px;padding:0;overflow:hidden">
-      <div style="padding:16px 24px 8px"><div class="card-t" style="margin-bottom:0">🏁 Scenario Race</div></div>
-      <div id="scLeaderboard" style="padding:0 24px 20px"></div>
+      <div style="padding:16px 24px 0;display:flex;align-items:center;justify-content:space-between">
+        <div class="card-t" style="margin-bottom:0" id="scGraphTitle">📈 Scenario Evolution</div>
+      </div>
+      <div id="scGraph" style="padding:12px 24px 16px;min-height:220px"></div>
+      <!-- Legend — clickable -->
+      <div id="scGraphLegend" style="padding:0 24px 16px;display:flex;gap:12px;flex-wrap:wrap"></div>
     </div>
 
-    <!-- Qui gagne, qui perd — bar chart -->
-    <div class="card" style="margin-bottom:20px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-        <div class="card-t" style="margin-bottom:0">⚖️ Qui gagne, qui perd</div>
-        <button class="btn btn-s" onclick="runPowerShift()" id="psBtn" style="font-size:12px">🤖 Analyze</button>
+    <!-- BLOC 2: Scenario Cards (compact) -->
+    <div id="scCards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-bottom:20px"></div>
+
+    <!-- Actors view (hidden by default) -->
+    <div id="scActorsView" style="display:none">
+      <div class="card" style="margin-bottom:20px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <div class="card-t" style="margin-bottom:0">⚖️ Qui gagne, qui perd</div>
+          <button class="btn btn-s" onclick="runPowerShift()" id="psBtn" style="font-size:12px">🤖 Analyze</button>
+        </div>
+        <div style="font-size:12px;color:var(--ink3);margin-bottom:12px">Impact de l'IA sur l'équilibre des forces entre les acteurs du secteur</div>
+        <div id="psSummary" style="font-size:13px;color:var(--ink2);line-height:1.7;margin-bottom:16px"></div>
+        <div id="psChart"></div>
       </div>
-      <div style="font-size:12px;color:var(--ink3);margin-bottom:12px">Impact de l'IA sur l'équilibre des forces entre les acteurs du secteur</div>
-      <div id="psSummary" style="font-size:13px;color:var(--ink2);line-height:1.7;margin-bottom:16px"></div>
-      <div id="psChart"></div>
+    </div>
+  </div>
+
+  <!-- TAB: Test Scenarios (NEW) -->
+  <div class="tab-pg" id="itab-testsc">
+    <div style="margin-bottom:20px">
+      <div style="font-size:15px;font-weight:700;margin-bottom:6px">🧪 Test Your Own Scenarios</div>
+      <div style="font-size:13px;color:var(--ink3);line-height:1.6">Write your own strategic hypotheses and let AI evaluate them against all collected signals. Uses the Scenario Model (configurable in Settings).</div>
+    </div>
+    <!-- Custom scenario input -->
+    <div class="card" style="margin-bottom:16px">
+      <div style="margin-bottom:12px">
+        <label>Your scenario hypothesis</label>
+        <textarea id="testScInput" rows="3" placeholder="e.g. Google will become the primary booking channel for hotels within 2 years, bypassing OTAs entirely..." style="font-size:13px"></textarea>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-p" onclick="testCustomScenario()" id="testScBtn">🧠 Test against all signals</button>
+        <span style="font-size:11px;color:var(--ink4)" id="testScInfo"></span>
+      </div>
+    </div>
+    <!-- Saved custom scenarios -->
+    <div id="testScResults"></div>
+    <div style="margin-top:20px">
+      <div style="font-size:13px;font-weight:700;color:var(--ink2);margin-bottom:10px">📋 Saved Hypotheses</div>
+      <div id="testScSaved"></div>
     </div>
   </div>
 
@@ -484,10 +526,19 @@ hr.div{border:0;border-top:1px solid var(--border);margin:20px 0}
     <div class="api-st" id="apiSt" style="display:none;font-size:13px;padding:10px 14px;border-radius:10px;margin-top:10px"></div>
   </div>
   <div class="set-card">
-    <div class="set-title">🤖 Model</div>
+    <div class="set-title">🤖 Pipeline Model</div>
+    <div style="font-size:12px;color:var(--ink3);margin-bottom:8px">Used for signal extraction (fast, cheap)</div>
     <select id="modelSel" style="width:100%" onchange="DB.set('model',this.value);toast('✓')">
       <optgroup label="Anthropic"><option value="claude-haiku-4-5-20251001">Haiku 4.5 — Fast</option><option value="claude-sonnet-4-6">Sonnet — Best</option></optgroup>
       <optgroup label="OpenAI"><option value="gpt-4o-mini">GPT-4o Mini</option><option value="gpt-4o">GPT-4o</option></optgroup>
+    </select>
+  </div>
+  <div class="set-card">
+    <div class="set-title">🧠 Scenario Model</div>
+    <div style="font-size:12px;color:var(--ink3);margin-bottom:8px">Used for scenarios, power analysis, and briefs (smarter, more expensive)</div>
+    <select id="scModelSel" style="width:100%" onchange="DB.set('scModel',this.value);toast('✓')">
+      <optgroup label="Anthropic"><option value="claude-sonnet-4-6">Sonnet — Recommended</option><option value="claude-haiku-4-5-20251001">Haiku 4.5 — Fast</option></optgroup>
+      <optgroup label="OpenAI"><option value="gpt-4o">GPT-4o — Best</option><option value="gpt-4o-mini">GPT-4o Mini</option></optgroup>
     </select>
   </div>
   <div class="set-card">
@@ -583,7 +634,7 @@ function go(pg){
   if(pg==='pipe')renderPipe();
   if(pg==='settings')renderSet();
 }
-function itab(t){document.querySelectorAll('#pg-intel .tab').forEach(b=>b.classList.remove('on'));document.querySelectorAll('#pg-intel .tab-pg').forEach(p=>p.classList.remove('on'));document.querySelector('#pg-intel .tab[onclick*="\''+t+'\'"]')?.classList.add('on');document.getElementById('itab-'+t)?.classList.add('on');if(t==='companies')renderCo();if(t==='trends')renderTrends();if(t==='scenarios')renderSc();if(t==='heatmap')renderHeatmap()}
+function itab(t){document.querySelectorAll('#pg-intel .tab').forEach(b=>b.classList.remove('on'));document.querySelectorAll('#pg-intel .tab-pg').forEach(p=>p.classList.remove('on'));document.querySelector('#pg-intel .tab[onclick*="\''+t+'\'"]')?.classList.add('on');document.getElementById('itab-'+t)?.classList.add('on');if(t==='companies')renderCo();if(t==='trends')renderTrends();if(t==='scenarios')renderSc();if(t==='heatmap')renderHeatmap();if(t==='testsc')renderTestSc()}
 function ptab(t){document.querySelectorAll('#pg-pipe .tab').forEach(b=>b.classList.remove('on'));document.querySelectorAll('#pg-pipe .tab-pg').forEach(p=>p.classList.remove('on'));document.querySelector('#pg-pipe .tab[onclick*="\''+t+'\'"]')?.classList.add('on');document.getElementById('ptab-'+t)?.classList.add('on');if(t==='run')renderPipeRun();if(t==='sources')renderSrcTab();if(t==='usecases')renderUC()}
 
 // ═══ SIDEBAR ═══
@@ -805,209 +856,145 @@ function renderTechMatrix(sid){
   el.innerHTML='<div style="position:absolute;inset:0;padding:8px 0"><div style="display:flex;gap:12px;margin-bottom:14px;padding-left:130px">'+mats.map(m=>'<div style="display:flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--ink3)"><span style="width:11px;height:11px;border-radius:3px;background:'+mc[m]+'"></span>'+m+'</div>').join('')+'</div>'+techs.map(([tech,ucs])=>{const ct={};ucs.forEach(u=>{ct[u.ev]=(ct[u.ev]||0)+1});return'<div style="display:flex;align-items:center;gap:10px;height:32px;margin-bottom:6px"><div style="width:120px;text-align:right;font-size:12px;font-weight:600;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+tech+'</div><div style="flex:1;display:flex;height:22px;border-radius:5px;overflow:hidden;background:var(--bg)">'+mats.map(m=>{const n=ct[m]||0;return n?'<div style="width:'+(n/mx*100)+'%;background:'+mc[m]+';display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:white;min-width:16px">'+(n>1?n:'')+'</div>':''}).join('')+'</div><div style="width:28px;text-align:right;font-size:12px;font-weight:700;color:var(--ink3)">'+ucs.length+'</div></div>'}).join('')+'</div>';
 }
 
-// Scenarios — Leaderboard design
+// ═══ SCENARIO VIEW TOGGLE ═══
+let scViewMode='scenarios';
+function setScView(mode){
+  scViewMode=mode;
+  document.getElementById('scViewSc').classList.toggle('on',mode==='scenarios');
+  document.getElementById('scViewAc').classList.toggle('on',mode==='actors');
+  document.getElementById('scCards').style.display=mode==='scenarios'?'grid':'none';
+  document.getElementById('scActorsView').style.display=mode==='actors'?'block':'none';
+  document.getElementById('scGraphTitle').textContent=mode==='scenarios'?'📈 Scenario Evolution':'📈 Actor Power Evolution';
+  renderScGraph();
+}
+
+// ═══ SCENARIO AI (uses scenario model) ═══
+async function aiSc(sys,usr,mt){
+  const model=DB.get('scModel')||'claude-sonnet-4-6';
+  const key=DB.get('apiKey');const prov=DB.get('apiProvider')||(key?.startsWith('sk-ant')?'anthropic':'openai');
+  const maxTok=mt||2048;
+  if(prov==='openai'){const r=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model,max_tokens:maxTok,messages:[{role:'system',content:sys},{role:'user',content:usr}]})});if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e?.error?.message||'API '+r.status)}return(await r.json()).choices[0].message.content.trim()}
+  else{const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model,max_tokens:maxTok,system:sys,messages:[{role:'user',content:usr}]})});if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e?.error?.message||'API '+r.status)}return(await r.json()).content[0].text.trim()}
+}
+
+// ═══ RENDER SCENARIOS ═══
 function renderSc(){
   const sec=AS();const scenarios=SCEN(sec.id);const uc=UCf(sec.id);
-  const btn=document.getElementById('scActionBtn');
-  const regenBtn=document.getElementById('scRegenBtn');
-  const dataInfo=document.getElementById('scDataInfo');
-  const headline=document.getElementById('scHeadline');
-  const lb=document.getElementById('scLeaderboard');
+  const btn=document.getElementById('scActionBtn');const regenBtn=document.getElementById('scRegenBtn');const dataInfo=document.getElementById('scDataInfo');
   if(btn){if(scenarios.length){btn.textContent='🤖 Re-evaluate';btn.onclick=evalScenarios}else{btn.textContent='🎯 Generate Scenarios';btn.onclick=genScenarios}}
   if(regenBtn)regenBtn.style.display=scenarios.length?'inline-flex':'none';
-  if(dataInfo)dataInfo.textContent=uc.length?'Based on '+uc.length+' signals':'';
+  if(dataInfo)dataInfo.textContent=uc.length?uc.length+' signals':'';
   if(!scenarios.length){
-    if(headline)headline.innerHTML='';
-    lb.innerHTML='<div style="text-align:center;padding:40px;color:var(--ink3)"><div style="font-size:36px;margin-bottom:12px">🎯</div><div style="font-size:14px;font-weight:600;color:var(--ink2);margin-bottom:4px">No scenarios yet</div><div style="font-size:13px">Generate 2-3 forward-looking scenarios from your signals</div></div>';
-    return;
+    document.getElementById('scGraph').innerHTML='<div style="text-align:center;padding:40px;color:var(--ink3)"><div style="font-size:36px;margin-bottom:12px">🎯</div><div style="font-size:14px;font-weight:600;color:var(--ink2)">No scenarios yet</div><div style="font-size:13px">Generate scenarios from your signals</div></div>';
+    document.getElementById('scGraphLegend').innerHTML='';document.getElementById('scCards').innerHTML='';return;
   }
-  // Sort by probability
-  const probVal=s=>s.probability==='high'?3:s.probability==='medium'?2:1;
-  const sorted=[...scenarios].sort((a,b)=>probVal(b)-probVal(a));
-  window._scenarios=sorted;
-  // Headline
-  const leader=sorted[0];
-  if(headline)headline.innerHTML='🏁 <strong>'+leader.name+'</strong> leads'+(leader.confirming_signals?' — '+leader.confirming_signals.split(';')[0].trim().slice(0,60):'');
-  // Leaderboard rows
-  const probPct=s=>s.probability==='high'?85:s.probability==='medium'?50:20;
-  const probColor=s=>s.probability==='high'?'var(--red)':s.probability==='medium'?'var(--orange)':'var(--ink4)';
-  const probLabel=s=>s.probability==='high'?'High likelihood':s.probability==='medium'?'Medium likelihood':'Low likelihood';
-  const deltaIcon=s=>{if(!s.history||s.history.length<2)return'<span style="color:var(--ink4)">— New</span>';const prev=s.history[s.history.length-2].p;const cur=s.history[s.history.length-1].p;if(cur>prev)return'<span style="color:var(--green);font-weight:700">↑ Strengthened</span>';if(cur<prev)return'<span style="color:var(--red);font-weight:700">↓ Weakened</span>';return'<span style="color:var(--ink4)">→ Stable</span>'};
-  // Sparkline
-  function sparkSVG(history,color){if(!history||history.length<3)return'';const pts=history.slice(-8);const mx=Math.max(...pts.map(p=>p.p),0.01);const w=64;const h=20;const step=w/(pts.length-1);const d=pts.map((p,i)=>(i===0?'M':'L')+(i*step).toFixed(1)+','+(h-p.p/mx*h).toFixed(1)).join(' ');return'<svg width="'+w+'" height="'+h+'" style="flex-shrink:0"><path d="'+d+'" fill="none" stroke="'+color+'" stroke-width="2" stroke-linecap="round"/></svg>'}
-
-  lb.innerHTML=sorted.map((s,i)=>{
-    const pp=probPct(s);const pc=probColor(s);
-    return'<div style="display:flex;align-items:center;gap:16px;padding:16px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="showScDetail('+i+')">'
-      // Rank
-      +'<div style="font-family:var(--serif);font-size:26px;color:var(--ink4);width:28px;text-align:center;flex-shrink:0">'+(i+1)+'</div>'
-      // Main content
-      +'<div style="flex:1;min-width:0">'
-        +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">'
-          +'<div style="font-size:14px;font-weight:700;color:var(--ink)">'+s.name+'</div>'
-          +'<div style="font-size:12px">'+deltaIcon(s)+'</div>'
-        +'</div>'
-        // Confirming signal (1 line)
-        +(s.confirming_signals?'<div style="font-size:12px;color:var(--green);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:500px">✅ '+s.confirming_signals+'</div>':'')
-        +(s.invalidating_signals?'<div style="font-size:12px;color:var(--red);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:500px;margin-top:2px">❌ '+s.invalidating_signals+'</div>':'')
-      +'</div>'
-      // Sparkline
-      +'<div style="flex-shrink:0">'+sparkSVG(s.history,pc)+'</div>'
-      // Probability bar
-      +'<div style="width:140px;flex-shrink:0">'
-        +'<div style="display:flex;align-items:center;gap:8px">'
-          +'<div style="flex:1;height:8px;background:var(--bg);border-radius:4px;overflow:hidden"><div style="width:'+pp+'%;height:100%;background:'+pc+';border-radius:4px;transition:width 0.5s"></div></div>'
-          +'<span style="font-size:12px;font-weight:700;color:'+pc+';min-width:30px;text-align:right">'+pp+'%</span>'
-        +'</div>'
-        +'<div style="font-size:10px;color:var(--ink4);margin-top:2px;text-align:right">'+probLabel(s)+'</div>'
-      +'</div>'
-      // Arrow
-      +'<div style="font-size:14px;color:var(--ink4);flex-shrink:0">→</div>'
-    +'</div>';
-  }).join('');
-
-  // Power shift
+  window._scenarios=scenarios;renderScGraph();renderScCards(scenarios);
   const ps=PS(sec.id);if(ps)renderPS(ps);
 }
-// Scenario detail — follows Thomas framework section 6 exactly
-function showScDetail(i){
-  const s=window._scenarios[i];if(!s)return;
-  const probColor=s.probability==='high'?'var(--red)':s.probability==='medium'?'var(--orange)':'var(--ink4)';
-  const probPct=s.probability==='high'?85:s.probability==='medium'?50:20;
 
-  document.getElementById('dpC').innerHTML=
-    '<div class="dp-title" style="margin-bottom:16px">'+s.name+'</div>'
-
-    // Probability bar
-    +'<div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">'
-      +'<div style="flex:1;height:8px;background:var(--bg);border-radius:4px;overflow:hidden"><div style="width:'+probPct+'%;height:100%;background:'+probColor+';border-radius:4px"></div></div>'
-      +'<span style="font-size:13px;font-weight:700;color:'+probColor+'">'+s.probability.toUpperCase()+'</span>'
-    +'</div>'
-
-    // Description
-    +'<div style="font-size:14px;color:var(--ink);line-height:1.7;margin-bottom:24px">'+s.description+'</div>'
-
-    // Key Drivers (numbered)
-    +'<div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:8px">Key Drivers</div>'
-    +(s.key_drivers||s.drivers||[]).map((d,j)=>'<div style="display:flex;gap:8px;margin-bottom:6px;font-size:13px;color:var(--ink2);line-height:1.5"><span style="font-weight:700;color:var(--accent);flex-shrink:0">'+(j+1)+'</span>'+d+'</div>').join('')
-
-    // Winners / Losers — simple table
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:20px 0">'
-      +'<div><div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:8px">↑ Winners</div>'+(s.winners||[]).map(w=>'<div style="font-size:13px;padding:3px 0;color:var(--ink2)">'+w+'</div>').join('')+'</div>'
-      +'<div><div style="font-size:12px;font-weight:700;color:var(--red);margin-bottom:8px">↓ Losers</div>'+(s.losers||[]).map(l=>'<div style="font-size:13px;padding:3px 0;color:var(--ink2)">'+l+'</div>').join('')+'</div>'
-    +'</div>'
-
-    // Confirmation / Invalidation CRITERIA (what would confirm/invalidate — not what happened this week)
-    +'<div style="margin:20px 0;padding:16px;background:var(--bg);border-radius:10px">'
-      +'<div style="font-size:12px;font-weight:700;color:var(--ink);margin-bottom:10px">Signaux à surveiller</div>'
-      +'<div style="margin-bottom:10px"><div style="font-size:11px;font-weight:700;color:var(--green);margin-bottom:4px">✅ Confirmerait ce scénario :</div>'
-        +(s.confirm_criteria||s.signals_that_would_confirm||[]).map(c=>'<div style="font-size:12px;color:var(--ink2);padding:2px 0;padding-left:16px">• '+c+'</div>').join('')
-      +'</div>'
-      +'<div><div style="font-size:11px;font-weight:700;color:var(--red);margin-bottom:4px">❌ Invaliderait ce scénario :</div>'
-        +(s.invalidate_criteria||s.signals_that_would_invalidate||[]).map(c=>'<div style="font-size:12px;color:var(--ink2);padding:2px 0;padding-left:16px">• '+c+'</div>').join('')
-      +'</div>'
-    +'</div>'
-
-    // This week's evidence (only if re-evaluated)
-    +(s.confirming_signals||s.invalidating_signals?
-      '<div style="font-size:12px;font-weight:700;color:var(--ink);margin-bottom:8px">Cette semaine</div>'
-      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">'
-        +(s.confirming_signals?'<div style="font-size:12px;color:var(--green);line-height:1.5">✅ '+s.confirming_signals+'</div>':'<div></div>')
-        +(s.invalidating_signals?'<div style="font-size:12px;color:var(--red);line-height:1.5">❌ '+s.invalidating_signals+'</div>':'<div></div>')
-      +'</div>'
-    :'')
-
-    +(s.last_eval?'<div style="font-size:11px;color:var(--ink4);margin-top:16px">Dernière évaluation : '+new Date(s.last_eval).toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})+(s.uc_count?' · basé sur '+s.uc_count+' signaux':'')+'</div>':'');
-
-  document.getElementById('dp').classList.add('on');document.getElementById('ov').classList.add('on');
+// ═══ SVG EVOLUTION GRAPH ═══
+function renderScGraph(){
+  const sec=AS();const scenarios=SCEN(sec.id);const ps=PS(sec.id);
+  const el=document.getElementById('scGraph');const legEl=document.getElementById('scGraphLegend');if(!el)return;
+  const isActors=scViewMode==='actors';const colors=['#dc2626','#2563eb','#16a34a','#ea580c','#7c3aed','#0891b2','#d97706'];
+  if(isActors&&ps?.actors){
+    const sorted=[...ps.actors].sort((a,b)=>b.score-a.score);const maxAbs=Math.max(...sorted.map(a=>Math.abs(a.score)),1);
+    el.innerHTML=sorted.map((a,i)=>{const isPos=a.score>=0;const barW=Math.round(Math.abs(a.score)/maxAbs*100);const color=isPos?'var(--green)':'var(--red)';
+      return'<div style="margin-bottom:10px;cursor:pointer" onclick="showActorDetail('+i+')"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px"><span style="font-size:13px;font-weight:600">'+a.name+'</span><span style="font-size:13px;font-weight:700;color:'+color+'">'+(isPos?'+':'')+a.score+'</span></div><div style="height:6px;background:var(--bg);border-radius:3px;overflow:hidden"><div style="width:'+barW+'%;height:100%;background:'+color+';border-radius:3px"></div></div></div>';
+    }).join('');legEl.innerHTML='<div style="font-size:11px;color:var(--ink4)">Click on an actor for detailed rationale</div>';window._psActors=sorted;return;
+  }
+  if(!scenarios.length||!scenarios.some(s=>s.history?.length)){el.innerHTML='<div style="text-align:center;padding:30px;color:var(--ink3)">Re-evaluate weekly to build the timeline</div>';legEl.innerHTML='';return;}
+  const W=el.clientWidth||600;const H=200;const PAD={t:20,r:20,b:30,l:40};const plotW=W-PAD.l-PAD.r;const plotH=H-PAD.t-PAD.b;
+  const allDates=new Set();scenarios.forEach(s=>(s.history||[]).forEach(h=>allDates.add(h.d?.split('T')[0]||'')));const dates=[...allDates].sort();
+  if(dates.length<1){el.innerHTML='<div style="text-align:center;padding:30px;color:var(--ink3)">Re-evaluate to build chart</div>';return;}
+  const xS=d=>PAD.l+(dates.indexOf(d)/Math.max(dates.length-1,1))*plotW;const yS=p=>PAD.t+(1-p)*plotH;
+  let svg='<svg width="'+W+'" height="'+H+'" style="width:100%;height:auto">';
+  [0,25,50,75,100].forEach(v=>{const y=yS(v/100);svg+='<line x1="'+PAD.l+'" y1="'+y+'" x2="'+(W-PAD.r)+'" y2="'+y+'" stroke="var(--border)" stroke-width="1"/><text x="'+(PAD.l-6)+'" y="'+(y+4)+'" text-anchor="end" font-size="10" fill="var(--ink4)" font-family="var(--sans)">'+v+'%</text>';});
+  dates.forEach((d,i)=>{if(dates.length<=8||i%Math.ceil(dates.length/6)===0){svg+='<text x="'+xS(d)+'" y="'+(H-4)+'" text-anchor="middle" font-size="10" fill="var(--ink4)" font-family="var(--sans)">'+d.slice(5)+'</text>';}});
+  scenarios.forEach((s,si)=>{const pts=(s.history||[]).map(h=>({d:h.d?.split('T')[0]||'',p:h.p||0}));if(!pts.length)return;
+    const path=pts.map((p,i)=>(i===0?'M':'L')+xS(p.d).toFixed(1)+','+yS(p.p).toFixed(1)).join(' ');
+    svg+='<path d="'+path+'" fill="none" stroke="'+colors[si%7]+'" stroke-width="2.5" stroke-linecap="round"/>';
+    pts.forEach(p=>{svg+='<circle cx="'+xS(p.d).toFixed(1)+'" cy="'+yS(p.p).toFixed(1)+'" r="4" fill="'+colors[si%7]+'" stroke="white" stroke-width="2"/>';});
+    const last=pts[pts.length-1];svg+='<text x="'+(xS(last.d)+8)+'" y="'+(yS(last.p)+4)+'" font-size="11" font-weight="600" fill="'+colors[si%7]+'" font-family="var(--sans)">'+Math.round(last.p*100)+'%</text>';
+  });svg+='</svg>';el.innerHTML=svg;
+  legEl.innerHTML=scenarios.map((s,i)=>'<div style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer" onclick="showScDetail('+i+')"><span style="width:12px;height:3px;border-radius:2px;background:'+colors[i%7]+'"></span><span style="font-weight:600;color:var(--ink2)">'+s.name+'</span></div>').join('');
 }
 
+// ═══ COMPACT SCENARIO CARDS ═══
+function renderScCards(scenarios){
+  const el=document.getElementById('scCards');const colors=['#dc2626','#2563eb','#16a34a','#ea580c'];
+  const probPct=s=>s.probability==='high'?85:s.probability==='medium'?50:20;
+  const delta=s=>{if(!s.history||s.history.length<2)return{icon:'—',text:'New',color:'var(--ink4)'};const prev=s.history[s.history.length-2].p;const cur=s.history[s.history.length-1].p;if(cur>prev)return{icon:'↑',text:'Strengthened',color:'var(--green)'};if(cur<prev)return{icon:'↓',text:'Weakened',color:'var(--red)'};return{icon:'→',text:'Stable',color:'var(--ink4)'}};
+  el.innerHTML=scenarios.map((s,i)=>{const pp=probPct(s);const d=delta(s);const c=colors[i%4];
+    return'<div class="card" style="cursor:pointer;padding:18px 20px;position:relative;overflow:hidden" onclick="showScDetail('+i+')"><div style="position:absolute;top:0;left:0;right:0;height:3px;background:'+c+'"></div><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><span style="font-size:12px;font-weight:700;color:'+d.color+'">'+d.icon+' '+d.text+'</span><span style="font-size:20px;font-weight:800;color:'+c+'">'+pp+'%</span></div><div style="font-size:14px;font-weight:700;color:var(--ink);margin-bottom:6px;line-height:1.3">'+s.name+'</div><div style="font-size:12px;color:var(--ink3);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">'+(s.description||'')+'</div><div style="margin-top:10px;font-size:11px;color:var(--accent);font-weight:600">View details →</div></div>';
+  }).join('');
+}
+
+// ═══ SCENARIO DETAIL PANEL ═══
+function showScDetail(i){const s=window._scenarios?.[i];if(!s)return;const pc=s.probability==='high'?'var(--red)':s.probability==='medium'?'var(--orange)':'var(--ink4)';const pp=s.probability==='high'?85:s.probability==='medium'?50:20;
+  document.getElementById('dpC').innerHTML='<div class="dp-title" style="margin-bottom:16px">'+s.name+'</div><div style="display:flex;align-items:center;gap:12px;margin-bottom:20px"><div style="flex:1;height:8px;background:var(--bg);border-radius:4px;overflow:hidden"><div style="width:'+pp+'%;height:100%;background:'+pc+';border-radius:4px"></div></div><span style="font-size:14px;font-weight:700;color:'+pc+'">'+pp+'% — '+s.probability.toUpperCase()+'</span></div><div style="font-size:14px;color:var(--ink);line-height:1.7;margin-bottom:20px">'+s.description+'</div><div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:8px">Why this probability?</div>'+(s.key_drivers||s.drivers||[]).map((d,j)=>'<div style="display:flex;gap:8px;margin-bottom:6px;font-size:13px;color:var(--ink2);line-height:1.5"><span style="font-weight:700;color:var(--accent)">'+(j+1)+'.</span>'+d+'</div>').join('')+'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:20px 0"><div><div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:6px">↑ Winners</div>'+(s.winners||[]).map(w=>'<div style="font-size:13px;padding:2px 0;color:var(--ink2)">'+w+'</div>').join('')+'</div><div><div style="font-size:12px;font-weight:700;color:var(--red);margin-bottom:6px">↓ Losers</div>'+(s.losers||[]).map(l=>'<div style="font-size:13px;padding:2px 0;color:var(--ink2)">'+l+'</div>').join('')+'</div></div><div style="padding:14px;background:var(--bg);border-radius:10px;margin:16px 0"><div style="font-size:12px;font-weight:700;color:var(--ink);margin-bottom:8px">🔭 Signals to watch</div>'+(s.confirm_criteria||s.signals_that_would_confirm||[]).map(c=>'<div style="font-size:12px;color:var(--green);padding:2px 0">✅ '+c+'</div>').join('')+(s.invalidate_criteria||s.signals_that_would_invalidate||[]).map(c=>'<div style="font-size:12px;color:var(--red);padding:2px 0">❌ '+c+'</div>').join('')+'</div>'+(s.confirming_signals||s.invalidating_signals?'<div style="font-size:12px;font-weight:700;color:var(--ink);margin-bottom:6px">This week</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">'+(s.confirming_signals?'<div style="font-size:12px;color:var(--green);line-height:1.5">✅ '+s.confirming_signals+'</div>':'<div></div>')+(s.invalidating_signals?'<div style="font-size:12px;color:var(--red);line-height:1.5">❌ '+s.invalidating_signals+'</div>':'<div></div>')+'</div>':'')+(s.last_eval?'<div style="font-size:11px;color:var(--ink4)">Last eval: '+new Date(s.last_eval).toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})+'</div>':'');
+  document.getElementById('dp').classList.add('on');document.getElementById('ov').classList.add('on');}
+
+function showActorDetail(i){const a=window._psActors?.[i];if(!a)return;const color=a.score>=0?'var(--green)':a.score<0?'var(--red)':'var(--ink4)';const arrow=a.score>=0?'↑':a.score<0?'↓':'→';
+  document.getElementById('dpC').innerHTML='<div class="dp-title">'+a.name+'</div><div style="display:flex;align-items:center;gap:12px;margin-bottom:20px"><span style="font-size:28px;font-weight:800;color:'+color+'">'+arrow+' '+(a.score>0?'+':'')+a.score+'</span></div><div style="font-size:13px;font-weight:700;margin-bottom:6px">Funnel stage</div><div style="display:inline-flex;padding:4px 12px;background:rgba(37,99,235,0.06);border-radius:6px;font-weight:600;font-size:13px;margin-bottom:16px">'+(a.funnel_stage||'—')+'</div><div style="font-size:13px;font-weight:700;margin-bottom:6px">Why?</div><div style="font-size:14px;color:var(--ink2);line-height:1.7">'+(a.mechanism||a.reason||'—')+'</div>';
+  document.getElementById('dp').classList.add('on');document.getElementById('ov').classList.add('on');}
+
 function scenarioAction(){const sec=AS();if(SCEN(sec.id).length)evalScenarios();else genScenarios()}
-function regenScenarios(){const sec=AS();if(!confirm('Regenerate scenarios from all '+UCf(sec.id).length+' signals? This replaces the current scenarios.'))return;DB.del('sc_'+sec.id);renderSc();genScenarios()}
+function regenScenarios(){const sec=AS();if(!confirm('Regenerate from all '+UCf(sec.id).length+' signals?'))return;DB.del('sc_'+sec.id);renderSc();genScenarios()}
+
 async function genScenarios(){
   if(!DB.get('apiKey'))return toast('⚠ Key needed');const sec=AS();const uc=UCf(sec.id);if(!uc.length)return toast('Run pipeline first');
   const btn=document.getElementById('scActionBtn');btn.disabled=true;btn.textContent='⟳ Generating...';
-  const top=uc.sort((a,b)=>prio(b).sc-prio(a).sc).slice(0,25);
-  const signalList=top.map(u=>u.co+' : '+u.title+' ('+u.ev+')').join('\n');
-  const byCo={};uc.forEach(u=>{if(u.co&&u.co!=='—')byCo[u.co]=(byCo[u.co]||0)+1});
-  const topCos=Object.entries(byCo).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([n,c])=>n+' ('+c+')').join(', ');
-  const deployed=uc.filter(u=>['Deployed','Scaled'].includes(u.ev)).length;
-  try{const raw=await ai(
-    'You are a senior strategy consultant specialized in travel distribution and AI. You build forward-looking scenarios. Be specific. Cite real companies. No jargon. No vague statements.',
-    'Sector: '+sec.name+'\nTotal: '+uc.length+' signals, '+deployed+' deployed\nTop companies: '+topCos+'\n\nTop 25 signals:\n'+signalList+'\n\nBuild exactly 3 forward-looking scenarios following THIS EXACT STRUCTURE (from Thomas framework section 6):\n\nFor each scenario provide:\n- name: short, clear (max 8 words) — must answer "What if...?"\n- description: 2-3 sentences, specific, with company names\n- key_drivers: exactly 3 concrete drivers (facts, not concepts)\n- winners: list of specific types of players who benefit\n- losers: list of specific types of players who suffer\n- probability: low / medium / high\n- signals_that_would_confirm: 2-3 specific things that, if they happen next, would confirm this scenario\n- signals_that_would_invalidate: 2-3 specific things that would prove this scenario wrong\n\nIMPORTANT: "signals_that_would_confirm" and "signals_that_would_invalidate" are NOT about what happened this week. They are about what COULD happen in the future that would validate or kill the scenario.\n\nReturn ONLY valid JSON:\n[{"name":"string","description":"string","key_drivers":["3 items"],"winners":["types"],"losers":["types"],"probability":"low|medium|high","signals_that_would_confirm":["future signal 1","future signal 2"],"signals_that_would_invalidate":["future signal 1","future signal 2"]}]',
-    3000);
-    const sc=pJ(raw);sc.forEach(s=>{
-      s.created=new Date().toISOString();s.last_eval=new Date().toISOString();
-      s.history=[{d:new Date().toISOString(),p:s.probability==='high'?.85:s.probability==='medium'?.5:.2}];
-      s.confirm_criteria=s.signals_that_would_confirm||[];
-      s.invalidate_criteria=s.signals_that_would_invalidate||[];
-      s.confirming_signals='';s.invalidating_signals='';s.uc_count=uc.length;
-    });
-    DB.set('sc_'+sec.id,sc);renderSc();toast('✓ '+sc.length+' scenarios (from '+uc.length+' signals)');
+  const top=uc.sort((a,b)=>prio(b).sc-prio(a).sc).slice(0,25);const signalList=top.map(u=>u.co+' : '+u.title+' ('+u.ev+')').join('\n');
+  const byCo={};uc.forEach(u=>{if(u.co&&u.co!=='—')byCo[u.co]=(byCo[u.co]||0)+1});const topCos=Object.entries(byCo).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([n,c])=>n+'('+c+')').join(', ');
+  try{const raw=await aiSc('You are a senior strategy consultant in travel distribution. Build forward-looking scenarios. Be specific, cite companies. No jargon.','Sector: '+sec.name+'\nTotal: '+uc.length+' signals, '+uc.filter(u=>['Deployed','Scaled'].includes(u.ev)).length+' deployed\nTop: '+topCos+'\n\nSignals:\n'+signalList+'\n\nBuild 3 scenarios answering "What if...?"\nFor each: name (max 8 words), description (2-3 sentences with companies), key_drivers (3 facts), winners, losers, probability (low/medium/high), signals_that_would_confirm (2-3 future events), signals_that_would_invalidate (2-3 future events)\n\nReturn ONLY JSON:\n[{"name":"","description":"","key_drivers":["","",""],"winners":[""],"losers":[""],"probability":"","signals_that_would_confirm":["",""],"signals_that_would_invalidate":["",""]}]',3000);
+    const sc=pJ(raw);sc.forEach(s=>{s.created=new Date().toISOString();s.last_eval=new Date().toISOString();s.history=[{d:new Date().toISOString(),p:s.probability==='high'?.85:s.probability==='medium'?.5:.2}];s.confirm_criteria=s.signals_that_would_confirm||[];s.invalidate_criteria=s.signals_that_would_invalidate||[];s.confirming_signals='';s.invalidating_signals='';s.uc_count=uc.length});
+    DB.set('sc_'+sec.id,sc);renderSc();toast('✓ '+sc.length+' scenarios');
   }catch(e){toast('⚠ '+e.message)}btn.disabled=false;renderSc()}
+
 async function evalScenarios(){
   if(!DB.get('apiKey'))return toast('⚠');const sec=AS();const sc=SCEN(sec.id);const uc=UCf(sec.id);if(!sc.length||!uc.length)return toast('Need scenarios + data');
   const btn=document.getElementById('scActionBtn');btn.disabled=true;btn.textContent='⟳ Re-evaluating...';
-  const top=uc.sort((a,b)=>prio(b).sc-prio(a).sc).slice(0,20);
-  const signalList=top.map(u=>u.co+' : '+u.title+' ('+u.ev+')').join('\n');
-  const scenarioDesc=sc.map((s,i)=>(i+1)+'. '+s.name+' (currently: '+s.probability+')\n   Would CONFIRM: '+(s.confirm_criteria||[]).join('; ')+'\n   Would INVALIDATE: '+(s.invalidate_criteria||[]).join('; ')).join('\n');
-  try{const raw=await ai(
-    'You re-evaluate strategic scenarios based on new signals. For each scenario, check if any new signals match the confirmation or invalidation criteria. Be specific. Cite real signals.',
-    'Scenarios with their criteria:\n'+scenarioDesc+'\n\nLatest signals ('+uc.length+' total):\n'+signalList+'\n\nFor each scenario:\n1. Has the probability changed? (low/medium/high)\n2. Which specific signals this week CONFIRM this scenario? (cite company + what happened)\n3. Which specific signals this week CHALLENGE this scenario? (cite company + what happened)\n\nReturn ONLY valid JSON:\n[{"index":0,"probability":"low|medium|high","this_week_confirms":"specific signals that confirm","this_week_challenges":"specific signals that challenge"}]',
-    2048);
-    const ev=pJ(raw);ev.forEach(e=>{const s=sc[e.index];if(!s)return;s.probability=e.probability;s.confirming_signals=e.this_week_confirms||e.evidence_for||'';s.invalidating_signals=e.this_week_challenges||e.evidence_against||'';s.last_eval=new Date().toISOString();if(!s.history)s.history=[];s.history.push({d:new Date().toISOString(),p:e.probability==='high'?.85:e.probability==='medium'?.5:.2})});
-    DB.set('sc_'+sec.id,sc);renderSc();toast('✓ Re-evaluated ('+uc.length+' signals)');
+  const signalList=uc.sort((a,b)=>prio(b).sc-prio(a).sc).slice(0,20).map(u=>u.co+' : '+u.title+' ('+u.ev+')').join('\n');
+  const scDesc=sc.map((s,i)=>(i+1)+'. '+s.name+' ('+s.probability+')\n   Confirm: '+(s.confirm_criteria||[]).join('; ')+'\n   Invalidate: '+(s.invalidate_criteria||[]).join('; ')).join('\n');
+  try{const raw=await aiSc('Re-evaluate scenarios. Check signals vs criteria. Cite companies.','Scenarios:\n'+scDesc+'\n\nSignals ('+uc.length+'):\n'+signalList+'\n\nFor each: probability, this_week_confirms, this_week_challenges\nReturn ONLY JSON: [{"index":0,"probability":"","this_week_confirms":"","this_week_challenges":""}]',2048);
+    const ev=pJ(raw);ev.forEach(e=>{const s=sc[e.index];if(!s)return;s.probability=e.probability;s.confirming_signals=e.this_week_confirms||'';s.invalidating_signals=e.this_week_challenges||'';s.last_eval=new Date().toISOString();if(!s.history)s.history=[];s.history.push({d:new Date().toISOString(),p:e.probability==='high'?.85:e.probability==='medium'?.5:.2})});
+    DB.set('sc_'+sec.id,sc);renderSc();toast('✓ Re-evaluated');
   }catch(e){toast('⚠ '+e.message)}btn.disabled=false;renderSc()}
 
 async function runPowerShift(){
   if(!DB.get('apiKey'))return toast('⚠');const sec=AS();const uc=UCf(sec.id);if(!uc.length)return toast('No signals');
   const btn=document.getElementById('psBtn');btn.disabled=true;btn.textContent='⟳...';
-  const top=uc.sort((a,b)=>prio(b).sc-prio(a).sc).slice(0,20);
-  const signalList=top.map(u=>u.co+' : '+u.title+' ('+u.ev+')').join('\n');
-  const deployed=uc.filter(u=>['Deployed','Scaled'].includes(u.ev)).length;
-  try{const raw=await ai(
-    'You are a senior travel distribution strategy consultant. You analyze how AI shifts the balance of power between players. Be specific, cite companies from the signals. Write for executives.',
-    'Sector: '+sec.name+'\nTotal signals: '+uc.length+', deployed: '+deployed+'\n\nTop signals:\n'+signalList+'\n\nAnalyze the power shift between these players:\n'+POWER_ACTORS.join('\n')+'\n\nFor EACH player, provide THREE things (this is mandatory):\n1. DIRECTION: gaining, losing, or stable\n2. FUNNEL STAGE: at which stage of the customer journey they gain or lose power (inspiration / research / booking / in-stay / post-stay / operations)\n3. WHY: the specific mechanism — HOW do they capture or lose value? Reference concrete signals.\n\nAlso provide a 2-sentence executive summary.\n\nReturn ONLY valid JSON:\n{"summary":"2 sentences","actors":[{"name":"full player name","direction":"gaining|losing|stable","score":-100 to 100,"funnel_stage":"which stage","mechanism":"1 specific sentence with company names"}]}',
-    2048);
+  const signalList=uc.sort((a,b)=>prio(b).sc-prio(a).sc).slice(0,20).map(u=>u.co+' : '+u.title+' ('+u.ev+')').join('\n');
+  try{const raw=await aiSc('Analyze power shifts in travel distribution. Cite companies. Be specific.','Sector: '+sec.name+'\nActors: '+POWER_ACTORS.join(', ')+'\nSignals ('+uc.length+'):\n'+signalList+'\n\nFor EACH actor: direction (gaining/losing/stable), score (-100 to +100), funnel_stage, mechanism (1 sentence with companies)\nPlus 2-sentence summary.\n\nReturn ONLY JSON: {"summary":"","actors":[{"name":"","direction":"","score":0,"funnel_stage":"","mechanism":""}]}',2048);
     const ps=pJ(raw);DB.set('ps_'+sec.id,ps);renderPS(ps);toast('✓');
   }catch(e){toast('⚠ '+e.message)}btn.disabled=false;btn.textContent='🤖 Analyze'}
 
-// Qui gagne, qui perd — Thomas format: who / funnel stage / why
-function renderPS(ps){
-  if(!ps?.actors)return;
-  const sumEl=document.getElementById('psSummary');
-  const chartEl=document.getElementById('psChart');
-  if(sumEl)sumEl.innerHTML=ps.summary||'';
-  const gainers=[...ps.actors].filter(a=>a.score>0).sort((a,b)=>b.score-a.score);
-  const losers=[...ps.actors].filter(a=>a.score<0).sort((a,b)=>a.score-b.score);
-  const stable=[...ps.actors].filter(a=>a.score===0);
+function renderPS(ps){if(!ps?.actors)return;document.getElementById('psSummary').innerHTML=ps.summary||'';
+  const g=ps.actors.filter(a=>a.score>0).sort((a,b)=>b.score-a.score);const l=ps.actors.filter(a=>a.score<0).sort((a,b)=>a.score-b.score);const st=ps.actors.filter(a=>a.score===0);
+  function grp(actors,label,color,arrow){if(!actors.length)return'';return'<div style="margin-bottom:16px"><div style="font-size:13px;font-weight:700;color:'+color+';margin-bottom:8px">'+arrow+' '+label+'</div><table style="width:100%;border-collapse:collapse"><thead><tr style="border-bottom:2px solid var(--border)"><th style="text-align:left;font-size:10px;font-weight:700;color:var(--ink3);padding:8px 10px;text-transform:uppercase">Actor</th><th style="text-align:left;font-size:10px;font-weight:700;color:var(--ink3);padding:8px 10px;text-transform:uppercase">Funnel</th><th style="text-align:left;font-size:10px;font-weight:700;color:var(--ink3);padding:8px 10px;text-transform:uppercase">Why</th><th style="text-align:right;font-size:10px;font-weight:700;color:var(--ink3);padding:8px 10px;width:50px">Score</th></tr></thead><tbody>'+actors.map(a=>'<tr style="border-bottom:1px solid var(--border)"><td style="padding:10px;font-size:13px;font-weight:600">'+a.name+'</td><td style="padding:10px"><span style="background:rgba(37,99,235,0.06);padding:2px 8px;border-radius:4px;font-weight:600;font-size:11px">'+(a.funnel_stage||'—')+'</span></td><td style="padding:10px;font-size:12px;color:var(--ink2);line-height:1.5">'+(a.mechanism||a.reason||'')+'</td><td style="padding:10px;text-align:right;font-weight:700;color:'+color+'">'+(a.score>0?'+':'')+a.score+'</td></tr>').join('')+'</tbody></table></div>';}
+  document.getElementById('psChart').innerHTML=grp(g,'Gaining power','var(--green)','↑')+grp(l,'Losing power','var(--red)','↓')+grp(st,'Stable','var(--ink4)','→');}
 
-  function renderGroup(actors,label,color,arrow){
-    if(!actors.length)return'';
-    return'<div style="margin-bottom:20px">'
-      +'<div style="font-size:13px;font-weight:700;color:'+color+';margin-bottom:10px">'+arrow+' '+label+'</div>'
-      +'<table style="width:100%;border-collapse:collapse">'
-      +'<thead><tr style="border-bottom:2px solid var(--border)">'
-        +'<th style="text-align:left;font-size:10px;font-weight:700;color:var(--ink3);padding:8px 12px;text-transform:uppercase;letter-spacing:.06em">Acteur</th>'
-        +'<th style="text-align:left;font-size:10px;font-weight:700;color:var(--ink3);padding:8px 12px;text-transform:uppercase;letter-spacing:.06em">Étape du funnel</th>'
-        +'<th style="text-align:left;font-size:10px;font-weight:700;color:var(--ink3);padding:8px 12px;text-transform:uppercase;letter-spacing:.06em">Pourquoi</th>'
-        +'<th style="text-align:right;font-size:10px;font-weight:700;color:var(--ink3);padding:8px 12px;text-transform:uppercase;letter-spacing:.06em;width:50px">Score</th>'
-      +'</tr></thead><tbody>'
-      +actors.map(a=>{
-        const mech=a.mechanism||a.reason||'';
-        const funnel=a.funnel_stage||a.funnel||'—';
-        return'<tr style="border-bottom:1px solid var(--border)">'
-          +'<td style="padding:10px 12px;font-size:13px;font-weight:600;color:var(--ink)">'+a.name+'</td>'
-          +'<td style="padding:10px 12px;font-size:12px;color:var(--ink2)"><span style="background:rgba(37,99,235,0.06);padding:2px 8px;border-radius:4px;font-weight:600;font-size:11px">'+funnel+'</span></td>'
-          +'<td style="padding:10px 12px;font-size:12px;color:var(--ink2);line-height:1.5">'+mech+'</td>'
-          +'<td style="padding:10px 12px;text-align:right;font-size:13px;font-weight:700;color:'+color+'">'+(a.score>0?'+':'')+a.score+'</td>'
-        +'</tr>';
-      }).join('')
-      +'</tbody></table></div>';
-  }
+// ═══ TEST CUSTOM SCENARIOS ═══
+function renderTestSc(){const sec=AS();const saved=DB.get('tsc_'+sec.id)||[];const el=document.getElementById('testScSaved');const info=document.getElementById('testScInfo');
+  if(info)info.textContent=UCf(sec.id).length+' signals available';
+  if(!saved.length){el.innerHTML='<div style="color:var(--ink3);font-size:13px">No tested scenarios yet</div>';return;}
+  el.innerHTML=saved.map((s,i)=>{const pc=s.probability==='high'?'var(--red)':s.probability==='medium'?'var(--orange)':'var(--ink4)';
+    return'<div class="card" style="margin-bottom:10px;cursor:pointer" onclick="showTestScDetail('+i+')"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><span style="font-size:14px;font-weight:700">'+s.name+'</span><span style="font-size:13px;font-weight:700;color:'+pc+'">'+(s.probability||'?').toUpperCase()+'</span></div><div style="font-size:12px;color:var(--ink3);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">'+(s.analysis||'')+'</div><div style="font-size:11px;color:var(--ink4);margin-top:6px">'+new Date(s.tested_at).toLocaleDateString()+' · '+s.uc_count+' signals</div></div>';}).join('');}
 
-  chartEl.innerHTML=renderGroup(gainers,'Gagnent du pouvoir','var(--green)','↑')+renderGroup(losers,'Perdent du pouvoir','var(--red)','↓')+renderGroup(stable,'Stables','var(--ink4)','→');
-}
+async function testCustomScenario(){if(!DB.get('apiKey'))return toast('⚠');const input=document.getElementById('testScInput')?.value?.trim();if(!input)return toast('Write a hypothesis');
+  const sec=AS();const uc=UCf(sec.id);if(!uc.length)return toast('No signals');const btn=document.getElementById('testScBtn');btn.disabled=true;btn.textContent='⟳ Analyzing...';
+  const signalList=uc.sort((a,b)=>prio(b).sc-prio(a).sc).slice(0,25).map(u=>u.co+' : '+u.title+' ('+u.ev+')').join('\n');
+  try{const raw=await aiSc('You evaluate a strategic hypothesis against market signals. Be specific, cite companies, write analytically.','HYPOTHESIS: "'+input+'"\n\nDATA: '+uc.length+' signals\nSignals:\n'+signalList+'\n\nAnalyze:\n1. name (short)\n2. probability: low/medium/high\n3. analysis: 2-3 analytical paragraphs citing companies\n4. supporting: specific supporting signals\n5. contradicting: specific contradicting signals\n\nReturn ONLY JSON: {"name":"","probability":"","analysis":"","supporting":[""],"contradicting":[""]}',3000);
+    const result=pJ(raw);result.hypothesis=input;result.tested_at=new Date().toISOString();result.uc_count=uc.length;
+    const saved=DB.get('tsc_'+sec.id)||[];saved.unshift(result);DB.set('tsc_'+sec.id,saved.slice(0,20));
+    document.getElementById('testScResults').innerHTML='<div class="card" style="margin-bottom:16px;border-left:3px solid var(--accent)"><div style="font-family:var(--serif);font-size:16px;margin-bottom:12px">'+result.name+'</div><div style="display:inline-flex;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;background:rgba(0,0,0,0.04);color:'+(result.probability==='high'?'var(--red)':result.probability==='medium'?'var(--orange)':'var(--ink4)')+'">'+result.probability.toUpperCase()+'</div><div style="font-size:14px;color:var(--ink2);line-height:1.8;margin:16px 0">'+(result.analysis||'').replace(/\n/g,'<br>')+'</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'+(result.supporting?.length?'<div><div style="font-size:11px;font-weight:700;color:var(--green);margin-bottom:6px">✅ Supporting</div>'+result.supporting.map(s=>'<div style="font-size:12px;padding:2px 0">• '+s+'</div>').join('')+'</div>':'<div></div>')+(result.contradicting?.length?'<div><div style="font-size:11px;font-weight:700;color:var(--red);margin-bottom:6px">❌ Contradicting</div>'+result.contradicting.map(s=>'<div style="font-size:12px;padding:2px 0">• '+s+'</div>').join('')+'</div>':'<div></div>')+'</div></div>';
+    renderTestSc();toast('✓ Tested');
+  }catch(e){toast('⚠ '+e.message)}btn.disabled=false;btn.textContent='🧠 Test against all signals'}
+
+function showTestScDetail(i){const sec=AS();const s=(DB.get('tsc_'+sec.id)||[])[i];if(!s)return;const pc=s.probability==='high'?'var(--red)':s.probability==='medium'?'var(--orange)':'var(--ink4)';
+  document.getElementById('dpC').innerHTML='<div class="dp-title">'+s.name+'</div><div style="font-size:12px;color:var(--ink3);margin-bottom:16px">Hypothesis: "'+s.hypothesis+'"</div><div style="display:inline-flex;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;margin-bottom:16px;background:rgba(0,0,0,0.04);color:'+pc+'">'+(s.probability||'?').toUpperCase()+'</div><div style="font-size:14px;color:var(--ink2);line-height:1.8;margin-bottom:16px">'+(s.analysis||'').replace(/\n/g,'<br>')+'</div>'+(s.supporting?.length?'<div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:var(--green);margin-bottom:6px">✅ Supporting</div>'+s.supporting.map(x=>'<div style="font-size:12px;padding:2px 0">• '+x+'</div>').join('')+'</div>':'')+(s.contradicting?.length?'<div><div style="font-size:11px;font-weight:700;color:var(--red);margin-bottom:6px">❌ Contradicting</div>'+s.contradicting.map(x=>'<div style="font-size:12px;padding:2px 0">• '+x+'</div>').join('')+'</div>':'')+'<div style="font-size:11px;color:var(--ink4);margin-top:16px">'+new Date(s.tested_at).toLocaleDateString()+' · '+s.uc_count+' signals</div>';
+  document.getElementById('dp').classList.add('on');document.getElementById('ov').classList.add('on');}
 
 // Heatmap
 function renderHeatmap(){
@@ -1096,7 +1083,7 @@ function exportNL(){
 }
 
 // ═══ SETTINGS ═══
-function renderSet(){const k=DB.get('apiKey')||'';document.getElementById('apiKeyIn').value=k?'••••••••••••••••':'';document.getElementById('modelSel').value=DB.get('model')||'claude-haiku-4-5-20251001';const p=document.getElementById('apiProv');if(p)p.value=DB.get('apiProvider')||'anthropic';updSt();const el=document.getElementById('storInfo');if(el){let t=0;for(let i=0;i<localStorage.length;i++)t+=localStorage.getItem(localStorage.key(i)).length;el.innerHTML='<div style="font-size:13px;color:var(--ink2)">💾 '+(t/1024/1024).toFixed(2)+' MB · '+UC().length+' signals</div>'}}
+function renderSet(){const k=DB.get('apiKey')||'';document.getElementById('apiKeyIn').value=k?'••••••••••••••••':'';document.getElementById('modelSel').value=DB.get('model')||'claude-haiku-4-5-20251001';const scM=document.getElementById('scModelSel');if(scM)scM.value=DB.get('scModel')||'claude-sonnet-4-6';const p=document.getElementById('apiProv');if(p)p.value=DB.get('apiProvider')||'anthropic';updSt();const el=document.getElementById('storInfo');if(el){let t=0;for(let i=0;i<localStorage.length;i++)t+=localStorage.getItem(localStorage.key(i)).length;el.innerHTML='<div style="font-size:13px;color:var(--ink2)">💾 '+(t/1024/1024).toFixed(2)+' MB · '+UC().length+' signals</div>'}}
 function saveKey(){const v=document.getElementById('apiKeyIn').value.trim();if(!v||v.startsWith('•'))return toast('Enter real key');DB.set('apiKey',v);document.getElementById('apiKeyIn').value='••••••••••••••••';updSt();toast('✓')}
 function updSt(){const el=document.getElementById('apiSt');const k=DB.get('apiKey');el.style.display='block';if(k){el.style.cssText='display:block;background:rgba(22,163,74,0.08);color:#16a34a;border-radius:10px;border:1px solid rgba(22,163,74,0.2);font-size:13px;padding:10px 14px;margin-top:10px';el.textContent='✓ Key configured'}else{el.style.cssText='display:block;background:rgba(234,88,12,0.08);color:#ea580c;border-radius:10px;border:1px solid rgba(234,88,12,0.2);font-size:13px;padding:10px 14px;margin-top:10px';el.textContent='⚠ Key missing'}}
 function exportAll(){const d={};for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);try{d[k]=JSON.parse(localStorage.getItem(k))}catch{d[k]=localStorage.getItem(k)}}const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(d,null,2)],{type:'application/json'}));a.download='marketradar-v4.json';a.click();toast('✓')}
