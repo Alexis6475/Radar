@@ -536,7 +536,7 @@ const DB={get:k=>{try{return JSON.parse(localStorage.getItem(k))}catch{return nu
 
 // ═══ PILLARS ═══
 const PIL={1:{n:'AI as Travel Companion',i:'🧭',c:'var(--p1)'},2:{n:'Upgraded Guest Experience',i:'⭐',c:'var(--p2)'},3:{n:'Enhanced Commercial Power',i:'📊',c:'var(--p3)'},4:{n:'Streamlined Operations',i:'⚙️',c:'var(--p4)'}};
-const POWER_ACTORS=['OTAs','Google','LLM Players','Metasearch','Suppliers','Bedbanks','Tech Providers','AI Entrants'];
+const POWER_ACTORS=['Online Travel Agencies (Booking, Expedia)','Google & Apple','AI Assistants (ChatGPT, Gemini, Claude)','Hotels & Airlines (direct)','Metasearch (Trivago, Kayak)','Tech Providers (Amadeus, Sabre)','AI-native Startups'];
 
 // ═══ PRESETS ═══
 const PRESETS=[
@@ -869,21 +869,49 @@ function renderSc(){
   // Power shift
   const ps=PS(sec.id);if(ps)renderPS(ps);
 }
-// Scenario detail in side panel
+// Scenario detail in side panel — clean and scannable
 function showScDetail(i){
   const s=window._scenarios[i];if(!s)return;
   const probColor=s.probability==='high'?'var(--red)':s.probability==='medium'?'var(--orange)':'var(--ink4)';
+  const probPct=s.probability==='high'?85:s.probability==='medium'?50:20;
+  const probLabel=s.probability==='high'?'Très probable':s.probability==='medium'?'Probable':'Peu probable';
+
   document.getElementById('dpC').innerHTML=
-    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><span style="display:inline-flex;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;background:rgba(0,0,0,0.04);color:'+probColor+'">'+s.probability.toUpperCase()+' LIKELIHOOD</span>'+(s.last_eval?'<span style="font-size:11px;color:var(--ink4)">Eval: '+new Date(s.last_eval).toLocaleDateString()+'</span>':'')+'</div>'
-    +'<div class="dp-title">'+s.name+'</div>'
-    +'<div style="font-size:14px;color:var(--ink2);line-height:1.7;margin-bottom:20px">'+s.description+'</div>'
-    +'<div class="dp-lb">Key Drivers</div><div class="dp-val" style="margin-bottom:16px">'+(s.drivers||[]).map(d=>'<div style="padding:4px 0;border-bottom:1px solid var(--border);font-size:13px">'+d+'</div>').join('')+'</div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">'
-      +'<div style="background:rgba(22,163,74,0.04);border-radius:10px;padding:12px"><div style="font-size:10px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">↑ Winners</div>'+(s.winners||[]).map(w=>'<div style="font-size:13px;font-weight:500;padding:2px 0">'+w+'</div>').join('')+'</div>'
-      +'<div style="background:rgba(220,38,38,0.04);border-radius:10px;padding:12px"><div style="font-size:10px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">↓ Losers</div>'+(s.losers||[]).map(l=>'<div style="font-size:13px;font-weight:500;padding:2px 0">'+l+'</div>').join('')+'</div>'
+    // Title + probability
+    '<div class="dp-title" style="margin-bottom:4px">'+s.name+'</div>'
+    +'<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">'
+      +'<div style="flex:1;height:8px;background:var(--bg);border-radius:4px;overflow:hidden"><div style="width:'+probPct+'%;height:100%;background:'+probColor+';border-radius:4px"></div></div>'
+      +'<span style="font-size:13px;font-weight:700;color:'+probColor+'">'+probPct+'% — '+probLabel+'</span>'
     +'</div>'
-    +(s.confirming_signals?'<div class="dp-lb">Confirming Signals</div><div style="font-size:13px;color:var(--green);line-height:1.6;margin-bottom:12px">'+s.confirming_signals+'</div>':'')
-    +(s.invalidating_signals?'<div class="dp-lb">Challenging Signals</div><div style="font-size:13px;color:var(--red);line-height:1.6;margin-bottom:12px">'+s.invalidating_signals+'</div>':'');
+
+    // What is this scenario — 2 sentences max
+    +'<div style="font-size:14px;color:var(--ink);line-height:1.7;margin-bottom:24px;padding:16px;background:var(--bg);border-radius:10px">'+s.description+'</div>'
+
+    // Why we think this — drivers as numbered list
+    +'<div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:10px">Pourquoi ce scénario ?</div>'
+    +(s.drivers||[]).map((d,j)=>'<div style="display:flex;gap:10px;margin-bottom:8px;font-size:13px;color:var(--ink2);line-height:1.5"><span style="font-weight:700;color:var(--accent);flex-shrink:0">'+(j+1)+'.</span><span>'+d+'</span></div>').join('')
+
+    // This week's evidence — FOR and AGAINST side by side
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:20px 0">'
+      +'<div style="border-radius:10px;padding:14px;border:1.5px solid rgba(22,163,74,0.2);background:rgba(22,163,74,0.03)">'
+        +'<div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:8px">✅ Ce qui confirme</div>'
+        +'<div style="font-size:13px;color:var(--ink2);line-height:1.6">'+(s.confirming_signals||'Pas encore de signaux')+'</div>'
+      +'</div>'
+      +'<div style="border-radius:10px;padding:14px;border:1.5px solid rgba(220,38,38,0.2);background:rgba(220,38,38,0.03)">'
+        +'<div style="font-size:12px;font-weight:700;color:var(--red);margin-bottom:8px">❌ Ce qui contredit</div>'
+        +'<div style="font-size:13px;color:var(--ink2);line-height:1.6">'+(s.invalidating_signals||'Pas encore de signaux')+'</div>'
+      +'</div>'
+    +'</div>'
+
+    // Winners / Losers — simple two columns
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
+      +'<div><div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:6px">↑ Qui en profite</div>'+(s.winners||[]).map(w=>'<div style="font-size:13px;padding:3px 0;color:var(--ink2)">• '+w+'</div>').join('')+'</div>'
+      +'<div><div style="font-size:12px;font-weight:700;color:var(--red);margin-bottom:6px">↓ Qui est menacé</div>'+(s.losers||[]).map(l=>'<div style="font-size:13px;padding:3px 0;color:var(--ink2)">• '+l+'</div>').join('')+'</div>'
+    +'</div>'
+
+    // Last eval date
+    +(s.last_eval?'<div style="margin-top:20px;font-size:11px;color:var(--ink4)">Dernière évaluation : '+new Date(s.last_eval).toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})+'</div>':'');
+
   document.getElementById('dp').classList.add('on');document.getElementById('ov').classList.add('on');
 }
 
@@ -931,7 +959,7 @@ async function runPowerShift(){
     const ps=pJ(raw);DB.set('ps_'+sec.id,ps);renderPS(ps);toast('✓');
   }catch(e){toast('⚠ '+e.message)}btn.disabled=false;btn.textContent='🤖 Analyze'}
 
-// Qui gagne, qui perd — centered horizontal bar chart
+// Qui gagne, qui perd — clean bar chart with full names
 function renderPS(ps){
   if(!ps?.actors)return;
   const sumEl=document.getElementById('psSummary');
@@ -940,20 +968,17 @@ function renderPS(ps){
   const sorted=[...ps.actors].sort((a,b)=>b.score-a.score);
   const maxAbs=Math.max(...sorted.map(a=>Math.abs(a.score)),1);
   chartEl.innerHTML=sorted.map(a=>{
-    const isPos=a.score>=0;const barW=Math.round(Math.abs(a.score)/maxAbs*50);
+    const isPos=a.score>=0;const barW=Math.round(Math.abs(a.score)/maxAbs*100);
     const color=isPos?'var(--green)':'var(--red)';
+    const arrow=isPos?'↑':a.score<0?'↓':'→';
     const reason=a.reason||a.mechanism||'';
-    return'<div style="display:flex;align-items:center;gap:0;height:36px;margin-bottom:4px">'
-      +'<div style="width:130px;text-align:right;font-size:12px;font-weight:600;color:var(--ink2);padding-right:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+a.name+'</div>'
-      +'<div style="width:calc(50% - 65px);display:flex;justify-content:flex-end">'
-        +(isPos?'':'<div style="width:'+barW+'%;height:10px;background:'+color+';border-radius:4px 0 0 4px;min-width:4px"></div>')
+    return'<div style="margin-bottom:12px">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">'
+        +'<div style="display:flex;align-items:center;gap:6px"><span style="font-size:14px;font-weight:700;color:'+color+'">'+arrow+'</span><span style="font-size:13px;font-weight:600;color:var(--ink)">'+a.name+'</span></div>'
+        +'<span style="font-size:13px;font-weight:700;color:'+color+'">'+(isPos?'+':'')+a.score+'</span>'
       +'</div>'
-      +'<div style="width:2px;height:20px;background:var(--border2);flex-shrink:0"></div>'
-      +'<div style="width:calc(50% - 65px)">'
-        +(isPos?'<div style="width:'+barW+'%;height:10px;background:'+color+';border-radius:0 4px 4px 0;min-width:4px"></div>':'')
-      +'</div>'
-      +'<div style="width:45px;text-align:right;font-size:12px;font-weight:700;color:'+color+';padding-left:8px">'+(isPos?'+':'')+a.score+'</div>'
-      +'<div style="width:220px;font-size:11px;color:var(--ink3);padding-left:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+reason+'">'+reason+'</div>'
+      +'<div style="height:8px;background:var(--bg);border-radius:4px;overflow:hidden;margin-bottom:4px"><div style="width:'+barW+'%;height:100%;background:'+color+';border-radius:4px"></div></div>'
+      +'<div style="font-size:12px;color:var(--ink3);line-height:1.4">'+reason+'</div>'
     +'</div>';
   }).join('');
 }
