@@ -410,23 +410,19 @@ hr.div{border:0;border-top:1px solid var(--border);margin:20px 0}
   <div class="tab-pg" id="itab-testsc">
     <div style="margin-bottom:20px">
       <div style="font-size:15px;font-weight:700;margin-bottom:6px">🧪 Test Your Own Scenarios</div>
-      <div style="font-size:13px;color:var(--ink3);line-height:1.6">Write your own strategic hypotheses and let AI evaluate them against all collected signals. Uses the Scenario Model (configurable in Settings).</div>
+      <div style="font-size:13px;color:var(--ink3);line-height:1.6">Write strategic hypotheses — one per line. AI evaluates each against all your signals using the Scenario Model.</div>
     </div>
-    <!-- Custom scenario input -->
     <div class="card" style="margin-bottom:16px">
-      <div style="margin-bottom:12px">
-        <label>Your scenario hypothesis</label>
-        <textarea id="testScInput" rows="3" placeholder="e.g. Google will become the primary booking channel for hotels within 2 years, bypassing OTAs entirely..." style="font-size:13px"></textarea>
-      </div>
-      <div style="display:flex;gap:8px;align-items:center">
-        <button class="btn btn-p" onclick="testCustomScenario()" id="testScBtn">🧠 Test against all signals</button>
+      <div id="testScLines"></div>
+      <button onclick="addTestScLine()" style="font-size:12px;color:var(--accent);background:0;border:1px dashed var(--border2);border-radius:8px;padding:8px 16px;cursor:pointer;width:100%;margin:8px 0;font-family:var(--sans)">+ Add another hypothesis</button>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+        <button class="btn btn-p" onclick="testAllScenarios()" id="testScBtn">🧠 Test all against signals</button>
         <span style="font-size:11px;color:var(--ink4)" id="testScInfo"></span>
       </div>
     </div>
-    <!-- Saved custom scenarios -->
     <div id="testScResults"></div>
     <div style="margin-top:20px">
-      <div style="font-size:13px;font-weight:700;color:var(--ink2);margin-bottom:10px">📋 Saved Hypotheses</div>
+      <div style="font-size:13px;font-weight:700;color:var(--ink2);margin-bottom:10px">📋 History</div>
       <div id="testScSaved"></div>
     </div>
   </div>
@@ -860,146 +856,223 @@ function renderTechMatrix(sid){
 let scViewMode='scenarios';
 function setScView(mode){
   scViewMode=mode;
-  document.getElementById('scViewSc').classList.toggle('on',mode==='scenarios');
-  document.getElementById('scViewAc').classList.toggle('on',mode==='actors');
-  document.getElementById('scCards').style.display=mode==='scenarios'?'grid':'none';
-  document.getElementById('scActorsView').style.display=mode==='actors'?'block':'none';
-  document.getElementById('scGraphTitle').textContent=mode==='scenarios'?'📈 Scenario Evolution':'📈 Actor Power Evolution';
-  renderScGraph();
-}
 
-// ═══ SCENARIO AI (uses scenario model) ═══
-async function aiSc(sys,usr,mt){
-  const model=DB.get('scModel')||'claude-sonnet-4-6';
-  const key=DB.get('apiKey');const prov=DB.get('apiProvider')||(key?.startsWith('sk-ant')?'anthropic':'openai');
-  const maxTok=mt||2048;
-  if(prov==='openai'){const r=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model,max_tokens:maxTok,messages:[{role:'system',content:sys},{role:'user',content:usr}]})});if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e?.error?.message||'API '+r.status)}return(await r.json()).choices[0].message.content.trim()}
-  else{const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model,max_tokens:maxTok,system:sys,messages:[{role:'user',content:usr}]})});if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e?.error?.message||'API '+r.status)}return(await r.json()).content[0].text.trim()}
-}
+// ═══ SCENARIO VIEW ═══
+let scViewMode='scenarios';
+function setScView(mode){scViewMode=mode;document.getElementById('scViewSc').classList.toggle('on',mode==='scenarios');document.getElementById('scViewAc').classList.toggle('on',mode==='actors');document.getElementById('scCards').style.display=mode==='scenarios'?'grid':'none';document.getElementById('scActorsView').style.display=mode==='actors'?'block':'none';document.getElementById('scGraphTitle').textContent=mode==='scenarios'?'📈 Scenario Evolution':'📈 Qui gagne, qui perd — Evolution';renderScGraph();}
 
-// ═══ RENDER SCENARIOS ═══
+// Scenario model
+async function aiSc(sys,usr,mt){const model=DB.get('scModel')||'claude-sonnet-4-6';const key=DB.get('apiKey');const prov=DB.get('apiProvider')||(key?.startsWith('sk-ant')?'anthropic':'openai');const mx=mt||2048;
+  if(prov==='openai'){const r=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model,max_tokens:mx,messages:[{role:'system',content:sys},{role:'user',content:usr}]})});if(!r.ok)throw new Error((await r.json().catch(()=>({}))).error?.message||'API '+r.status);return(await r.json()).choices[0].message.content.trim()}
+  else{const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model,max_tokens:mx,system:sys,messages:[{role:'user',content:usr}]})});if(!r.ok)throw new Error((await r.json().catch(()=>({}))).error?.message||'API '+r.status);return(await r.json()).content[0].text.trim()}}
+
 function renderSc(){
   const sec=AS();const scenarios=SCEN(sec.id);const uc=UCf(sec.id);
-  const btn=document.getElementById('scActionBtn');const regenBtn=document.getElementById('scRegenBtn');const dataInfo=document.getElementById('scDataInfo');
-  if(btn){if(scenarios.length){btn.textContent='🤖 Re-evaluate';btn.onclick=evalScenarios}else{btn.textContent='🎯 Generate Scenarios';btn.onclick=genScenarios}}
-  if(regenBtn)regenBtn.style.display=scenarios.length?'inline-flex':'none';
-  if(dataInfo)dataInfo.textContent=uc.length?uc.length+' signals':'';
-  if(!scenarios.length){
-    document.getElementById('scGraph').innerHTML='<div style="text-align:center;padding:40px;color:var(--ink3)"><div style="font-size:36px;margin-bottom:12px">🎯</div><div style="font-size:14px;font-weight:600;color:var(--ink2)">No scenarios yet</div><div style="font-size:13px">Generate scenarios from your signals</div></div>';
-    document.getElementById('scGraphLegend').innerHTML='';document.getElementById('scCards').innerHTML='';return;
-  }
+  const btn=document.getElementById('scActionBtn');const regen=document.getElementById('scRegenBtn');const info=document.getElementById('scDataInfo');
+  if(btn){if(scenarios.length){btn.textContent='🤖 Re-evaluate';btn.onclick=evalScenarios}else{btn.textContent='🎯 Generate';btn.onclick=genScenarios}}
+  if(regen)regen.style.display=scenarios.length?'inline-flex':'none';
+  if(info)info.textContent=uc.length?uc.length+' signals':'';
+  if(!scenarios.length){document.getElementById('scGraph').innerHTML='<div style="text-align:center;padding:48px;color:var(--ink3)"><div style="font-size:36px;margin-bottom:12px">🎯</div><div style="font-size:14px;font-weight:600;color:var(--ink2)">No scenarios</div><div style="font-size:13px">Generate scenarios from your signals</div></div>';document.getElementById('scGraphLegend').innerHTML='';document.getElementById('scCards').innerHTML='';return}
   window._scenarios=scenarios;renderScGraph();renderScCards(scenarios);
   const ps=PS(sec.id);if(ps)renderPS(ps);
 }
 
-// ═══ SVG EVOLUTION GRAPH ═══
+// ═══ SVG GRAPH — FIXED ═══
 function renderScGraph(){
   const sec=AS();const scenarios=SCEN(sec.id);const ps=PS(sec.id);
   const el=document.getElementById('scGraph');const legEl=document.getElementById('scGraphLegend');if(!el)return;
-  const isActors=scViewMode==='actors';const colors=['#dc2626','#2563eb','#16a34a','#ea580c','#7c3aed','#0891b2','#d97706'];
-  if(isActors&&ps?.actors){
-    const sorted=[...ps.actors].sort((a,b)=>b.score-a.score);const maxAbs=Math.max(...sorted.map(a=>Math.abs(a.score)),1);
-    el.innerHTML=sorted.map((a,i)=>{const isPos=a.score>=0;const barW=Math.round(Math.abs(a.score)/maxAbs*100);const color=isPos?'var(--green)':'var(--red)';
-      return'<div style="margin-bottom:10px;cursor:pointer" onclick="showActorDetail('+i+')"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px"><span style="font-size:13px;font-weight:600">'+a.name+'</span><span style="font-size:13px;font-weight:700;color:'+color+'">'+(isPos?'+':'')+a.score+'</span></div><div style="height:6px;background:var(--bg);border-radius:3px;overflow:hidden"><div style="width:'+barW+'%;height:100%;background:'+color+';border-radius:3px"></div></div></div>';
-    }).join('');legEl.innerHTML='<div style="font-size:11px;color:var(--ink4)">Click on an actor for detailed rationale</div>';window._psActors=sorted;return;
-  }
-  if(!scenarios.length||!scenarios.some(s=>s.history?.length)){el.innerHTML='<div style="text-align:center;padding:30px;color:var(--ink3)">Re-evaluate weekly to build the timeline</div>';legEl.innerHTML='';return;}
-  const W=el.clientWidth||600;const H=200;const PAD={t:20,r:20,b:30,l:40};const plotW=W-PAD.l-PAD.r;const plotH=H-PAD.t-PAD.b;
-  const allDates=new Set();scenarios.forEach(s=>(s.history||[]).forEach(h=>allDates.add(h.d?.split('T')[0]||'')));const dates=[...allDates].sort();
-  if(dates.length<1){el.innerHTML='<div style="text-align:center;padding:30px;color:var(--ink3)">Re-evaluate to build chart</div>';return;}
-  const xS=d=>PAD.l+(dates.indexOf(d)/Math.max(dates.length-1,1))*plotW;const yS=p=>PAD.t+(1-p)*plotH;
-  let svg='<svg width="'+W+'" height="'+H+'" style="width:100%;height:auto">';
-  [0,25,50,75,100].forEach(v=>{const y=yS(v/100);svg+='<line x1="'+PAD.l+'" y1="'+y+'" x2="'+(W-PAD.r)+'" y2="'+y+'" stroke="var(--border)" stroke-width="1"/><text x="'+(PAD.l-6)+'" y="'+(y+4)+'" text-anchor="end" font-size="10" fill="var(--ink4)" font-family="var(--sans)">'+v+'%</text>';});
-  dates.forEach((d,i)=>{if(dates.length<=8||i%Math.ceil(dates.length/6)===0){svg+='<text x="'+xS(d)+'" y="'+(H-4)+'" text-anchor="middle" font-size="10" fill="var(--ink4)" font-family="var(--sans)">'+d.slice(5)+'</text>';}});
-  scenarios.forEach((s,si)=>{const pts=(s.history||[]).map(h=>({d:h.d?.split('T')[0]||'',p:h.p||0}));if(!pts.length)return;
-    const path=pts.map((p,i)=>(i===0?'M':'L')+xS(p.d).toFixed(1)+','+yS(p.p).toFixed(1)).join(' ');
-    svg+='<path d="'+path+'" fill="none" stroke="'+colors[si%7]+'" stroke-width="2.5" stroke-linecap="round"/>';
-    pts.forEach(p=>{svg+='<circle cx="'+xS(p.d).toFixed(1)+'" cy="'+yS(p.p).toFixed(1)+'" r="4" fill="'+colors[si%7]+'" stroke="white" stroke-width="2"/>';});
-    const last=pts[pts.length-1];svg+='<text x="'+(xS(last.d)+8)+'" y="'+(yS(last.p)+4)+'" font-size="11" font-weight="600" fill="'+colors[si%7]+'" font-family="var(--sans)">'+Math.round(last.p*100)+'%</text>';
-  });svg+='</svg>';el.innerHTML=svg;
-  legEl.innerHTML=scenarios.map((s,i)=>'<div style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer" onclick="showScDetail('+i+')"><span style="width:12px;height:3px;border-radius:2px;background:'+colors[i%7]+'"></span><span style="font-weight:600;color:var(--ink2)">'+s.name+'</span></div>').join('');
+  const colors=['#dc2626','#2563eb','#16a34a','#ea580c','#7c3aed','#0891b2'];
+
+  if(scViewMode==='actors'&&ps?.actors){
+    const sorted=[...ps.actors].sort((a,b)=>b.score-a.score);const mx=Math.max(...sorted.map(a=>Math.abs(a.score)),1);window._psActors=sorted;
+    el.innerHTML=sorted.map((a,i)=>{const p=a.score>=0;const w=Math.round(Math.abs(a.score)/mx*100);const c=p?'var(--green)':'var(--red)';
+      return'<div style="margin-bottom:12px;cursor:pointer" onclick="showActorDetail('+i+')"><div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-size:13px;font-weight:600">'+a.name+'</span><span style="font-size:13px;font-weight:700;color:'+c+'">'+(p?'+':'')+a.score+'</span></div><div style="height:7px;background:var(--bg);border-radius:4px;overflow:hidden"><div style="width:'+w+'%;height:100%;background:'+c+';border-radius:4px"></div></div><div style="font-size:11px;color:var(--ink3);margin-top:2px">'+(a.funnel_stage||'')+(a.mechanism?' — '+a.mechanism:'')+'</div></div>';
+    }).join('');legEl.innerHTML='<div style="font-size:11px;color:var(--ink4)">Click an actor for details</div>';return}
+
+  if(!scenarios.length){el.innerHTML='<div style="text-align:center;padding:30px;color:var(--ink3)">No data</div>';legEl.innerHTML='';return}
+
+  // Compute prob values consistently
+  const probNum=s=>s.probability==='high'?0.85:s.probability==='medium'?0.5:0.2;
+
+  // Build SVG
+  const W=Math.max(el.clientWidth||600,400);const H=240;const P={t:24,r:60,b:36,l:48};
+  const pW=W-P.l-P.r;const pH=H-P.t-P.b;
+
+  // Collect all unique dates
+  const allD=new Set();scenarios.forEach(s=>(s.history||[]).forEach(h=>{const d=h.d?.split('T')[0];if(d)allD.add(d)}));
+  const dates=[...allD].sort();
+
+  // If only 1 date, add a fake "now" point slightly later for visual
+  if(dates.length===0){el.innerHTML='<div style="text-align:center;padding:30px;color:var(--ink3)">Re-evaluate weekly to build the chart</div>';legEl.innerHTML='';return}
+
+  const xS=d=>{if(dates.length===1)return P.l+pW/2;return P.l+(dates.indexOf(d)/Math.max(dates.length-1,1))*pW};
+  const yS=v=>P.t+(1-v)*pH;
+
+  let svg='<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block">';
+
+  // Y grid + labels
+  [0,25,50,75,100].forEach(v=>{const y=yS(v/100);
+    svg+='<line x1="'+P.l+'" y1="'+y+'" x2="'+(W-P.r)+'" y2="'+y+'" stroke="#e4e4e7" stroke-width="1" stroke-dasharray="4,4"/>';
+    svg+='<text x="'+(P.l-8)+'" y="'+(y+4)+'" text-anchor="end" font-size="11" font-weight="600" fill="#a1a1aa" font-family="var(--sans)">'+v+'%</text>';
+  });
+
+  // X labels (dates)
+  const maxLabels=8;const step=Math.max(1,Math.ceil(dates.length/maxLabels));
+  dates.forEach((d,i)=>{if(i%step===0||i===dates.length-1){
+    svg+='<text x="'+xS(d)+'" y="'+(H-6)+'" text-anchor="middle" font-size="11" font-weight="500" fill="#a1a1aa" font-family="var(--sans)">'+d.slice(5).replace('-','/')+'</text>';
+    svg+='<line x1="'+xS(d)+'" y1="'+P.t+'" x2="'+xS(d)+'" y2="'+(H-P.b)+'" stroke="#f4f4f5" stroke-width="1"/>';
+  }});
+
+  // Draw lines for each scenario
+  scenarios.forEach((s,si)=>{
+    const hist=s.history||[];if(!hist.length)return;
+    const col=colors[si%6];
+    // Build points using ACTUAL stored prob values
+    const pts=hist.map(h=>({x:xS(h.d?.split('T')[0]||dates[0]),y:yS(h.p||probNum(s))}));
+
+    // Line
+    if(pts.length>1){const path=pts.map((p,i)=>(i===0?'M':'L')+p.x.toFixed(1)+','+p.y.toFixed(1)).join(' ');
+      svg+='<path d="'+path+'" fill="none" stroke="'+col+'" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>';}
+
+    // Dots
+    pts.forEach(p=>{svg+='<circle cx="'+p.x.toFixed(1)+'" cy="'+p.y.toFixed(1)+'" r="5" fill="'+col+'" stroke="white" stroke-width="2.5"/>';});
+
+    // Label at end
+    const last=pts[pts.length-1];const pct=Math.round((hist[hist.length-1].p||probNum(s))*100);
+    svg+='<text x="'+(last.x+10)+'" y="'+(last.y+5)+'" font-size="13" font-weight="700" fill="'+col+'" font-family="var(--sans)">'+pct+'%</text>';
+  });
+
+  svg+='</svg>';el.innerHTML=svg;
+
+  // Legend
+  legEl.innerHTML=scenarios.map((s,i)=>'<div style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;padding:4px 0" onclick="showScDetail('+i+')"><span style="width:16px;height:4px;border-radius:2px;background:'+colors[i%6]+';flex-shrink:0"></span><span style="font-weight:600;color:var(--ink)">'+s.name+'</span><span style="color:var(--ink4);font-weight:500">'+Math.round((s.history?.[s.history.length-1]?.p||0)*100)+'%</span></div>').join('');
 }
 
-// ═══ COMPACT SCENARIO CARDS ═══
 function renderScCards(scenarios){
   const el=document.getElementById('scCards');const colors=['#dc2626','#2563eb','#16a34a','#ea580c'];
-  const probPct=s=>s.probability==='high'?85:s.probability==='medium'?50:20;
-  const delta=s=>{if(!s.history||s.history.length<2)return{icon:'—',text:'New',color:'var(--ink4)'};const prev=s.history[s.history.length-2].p;const cur=s.history[s.history.length-1].p;if(cur>prev)return{icon:'↑',text:'Strengthened',color:'var(--green)'};if(cur<prev)return{icon:'↓',text:'Weakened',color:'var(--red)'};return{icon:'→',text:'Stable',color:'var(--ink4)'}};
-  el.innerHTML=scenarios.map((s,i)=>{const pp=probPct(s);const d=delta(s);const c=colors[i%4];
-    return'<div class="card" style="cursor:pointer;padding:18px 20px;position:relative;overflow:hidden" onclick="showScDetail('+i+')"><div style="position:absolute;top:0;left:0;right:0;height:3px;background:'+c+'"></div><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><span style="font-size:12px;font-weight:700;color:'+d.color+'">'+d.icon+' '+d.text+'</span><span style="font-size:20px;font-weight:800;color:'+c+'">'+pp+'%</span></div><div style="font-size:14px;font-weight:700;color:var(--ink);margin-bottom:6px;line-height:1.3">'+s.name+'</div><div style="font-size:12px;color:var(--ink3);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">'+(s.description||'')+'</div><div style="margin-top:10px;font-size:11px;color:var(--accent);font-weight:600">View details →</div></div>';
+  const probNum=s=>s.probability==='high'?85:s.probability==='medium'?50:20;
+  const delta=s=>{if(!s.history||s.history.length<2)return{i:'—',t:'New',c:'var(--ink4)'};const prev=s.history[s.history.length-2].p,cur=s.history[s.history.length-1].p;if(cur>prev)return{i:'↑',t:'Up',c:'var(--green)'};if(cur<prev)return{i:'↓',t:'Down',c:'var(--red)'};return{i:'→',t:'Stable',c:'var(--ink4)'}};
+  el.innerHTML=scenarios.map((s,i)=>{const pp=probNum(s);const d=delta(s);const c=colors[i%4];
+    return'<div class="card" style="cursor:pointer;padding:18px 20px;position:relative;overflow:hidden" onclick="showScDetail('+i+')"><div style="position:absolute;top:0;left:0;right:0;height:3px;background:'+c+'"></div><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><span style="font-size:12px;font-weight:700;color:'+d.c+'">'+d.i+' '+d.t+'</span><span style="font-family:var(--serif);font-size:22px;font-weight:800;color:'+c+'">'+pp+'%</span></div><div style="font-size:14px;font-weight:700;color:var(--ink);margin-bottom:6px;line-height:1.3">'+s.name+'</div><div style="font-size:12px;color:var(--ink3);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">'+(s.description||'')+'</div></div>';
   }).join('');
 }
 
-// ═══ SCENARIO DETAIL PANEL ═══
-function showScDetail(i){const s=window._scenarios?.[i];if(!s)return;const pc=s.probability==='high'?'var(--red)':s.probability==='medium'?'var(--orange)':'var(--ink4)';const pp=s.probability==='high'?85:s.probability==='medium'?50:20;
-  document.getElementById('dpC').innerHTML='<div class="dp-title" style="margin-bottom:16px">'+s.name+'</div><div style="display:flex;align-items:center;gap:12px;margin-bottom:20px"><div style="flex:1;height:8px;background:var(--bg);border-radius:4px;overflow:hidden"><div style="width:'+pp+'%;height:100%;background:'+pc+';border-radius:4px"></div></div><span style="font-size:14px;font-weight:700;color:'+pc+'">'+pp+'% — '+s.probability.toUpperCase()+'</span></div><div style="font-size:14px;color:var(--ink);line-height:1.7;margin-bottom:20px">'+s.description+'</div><div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:8px">Why this probability?</div>'+(s.key_drivers||s.drivers||[]).map((d,j)=>'<div style="display:flex;gap:8px;margin-bottom:6px;font-size:13px;color:var(--ink2);line-height:1.5"><span style="font-weight:700;color:var(--accent)">'+(j+1)+'.</span>'+d+'</div>').join('')+'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:20px 0"><div><div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:6px">↑ Winners</div>'+(s.winners||[]).map(w=>'<div style="font-size:13px;padding:2px 0;color:var(--ink2)">'+w+'</div>').join('')+'</div><div><div style="font-size:12px;font-weight:700;color:var(--red);margin-bottom:6px">↓ Losers</div>'+(s.losers||[]).map(l=>'<div style="font-size:13px;padding:2px 0;color:var(--ink2)">'+l+'</div>').join('')+'</div></div><div style="padding:14px;background:var(--bg);border-radius:10px;margin:16px 0"><div style="font-size:12px;font-weight:700;color:var(--ink);margin-bottom:8px">🔭 Signals to watch</div>'+(s.confirm_criteria||s.signals_that_would_confirm||[]).map(c=>'<div style="font-size:12px;color:var(--green);padding:2px 0">✅ '+c+'</div>').join('')+(s.invalidate_criteria||s.signals_that_would_invalidate||[]).map(c=>'<div style="font-size:12px;color:var(--red);padding:2px 0">❌ '+c+'</div>').join('')+'</div>'+(s.confirming_signals||s.invalidating_signals?'<div style="font-size:12px;font-weight:700;color:var(--ink);margin-bottom:6px">This week</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">'+(s.confirming_signals?'<div style="font-size:12px;color:var(--green);line-height:1.5">✅ '+s.confirming_signals+'</div>':'<div></div>')+(s.invalidating_signals?'<div style="font-size:12px;color:var(--red);line-height:1.5">❌ '+s.invalidating_signals+'</div>':'<div></div>')+'</div>':'')+(s.last_eval?'<div style="font-size:11px;color:var(--ink4)">Last eval: '+new Date(s.last_eval).toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})+'</div>':'');
+// ═══ SCENARIO DETAIL — consulting style ═══
+function showScDetail(i){
+  const s=window._scenarios?.[i];if(!s)return;
+  const pc=s.probability==='high'?'var(--red)':s.probability==='medium'?'var(--orange)':'var(--ink4)';
+  const pp=s.probability==='high'?85:s.probability==='medium'?50:20;
+  // Build supporting/contradicting signals display
+  const confirmSigs=(s.confirming_signals||'').split(/[;.]/).filter(x=>x.trim()).map(x=>'<div style="padding:6px 0;border-bottom:1px solid rgba(22,163,74,0.1);font-size:13px;color:var(--ink2)">✅ '+x.trim()+'</div>').join('');
+  const contradictSigs=(s.invalidating_signals||'').split(/[;.]/).filter(x=>x.trim()).map(x=>'<div style="padding:6px 0;border-bottom:1px solid rgba(220,38,38,0.1);font-size:13px;color:var(--ink2)">❌ '+x.trim()+'</div>').join('');
+
+  document.getElementById('dpC').innerHTML=
+    '<div class="dp-title" style="margin-bottom:12px">'+s.name+'</div>'
+    +'<div style="display:flex;align-items:center;gap:12px;margin-bottom:24px"><div style="flex:1;height:8px;background:var(--bg);border-radius:4px;overflow:hidden"><div style="width:'+pp+'%;height:100%;background:'+pc+';border-radius:4px"></div></div><span style="font-size:14px;font-weight:700;color:'+pc+'">'+pp+'%</span></div>'
+
+    // ANALYTICAL TEXT — this is the main content
+    +'<div style="font-size:14px;color:var(--ink);line-height:1.8;margin-bottom:24px">'+(s.description||'')+'</div>'
+    +'<div style="font-size:14px;color:var(--ink2);line-height:1.8;margin-bottom:24px">'+(s.rationale||((s.key_drivers||s.drivers||[]).map((d,j)=>'<strong>'+(j+1)+'.</strong> '+d).join('<br><br>'))|| '')+'</div>'
+
+    // SIGNALS POUR / CONTRE
+    +(confirmSigs||contradictSigs?
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">'
+      +'<div><div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:8px;padding-bottom:6px;border-bottom:2px solid var(--green)">Signals supporting this thesis</div>'+( confirmSigs||'<div style="font-size:12px;color:var(--ink4);padding:8px 0">No signals yet</div>')+'</div>'
+      +'<div><div style="font-size:12px;font-weight:700;color:var(--red);margin-bottom:8px;padding-bottom:6px;border-bottom:2px solid var(--red)">Signals contradicting this thesis</div>'+(contradictSigs||'<div style="font-size:12px;color:var(--ink4);padding:8px 0">No signals yet</div>')+'</div>'
+      +'</div>'
+    :'')
+    +(s.last_eval?'<div style="font-size:11px;color:var(--ink4);margin-top:20px">Last evaluation: '+new Date(s.last_eval).toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})+'</div>':'');
+  document.getElementById('dp').classList.add('on');document.getElementById('ov').classList.add('on');
+}
+
+function showActorDetail(i){const a=window._psActors?.[i];if(!a)return;const c=a.score>=0?'var(--green)':'var(--red)';
+  document.getElementById('dpC').innerHTML='<div class="dp-title">'+a.name+'</div><div style="font-size:28px;font-weight:800;color:'+c+';margin:12px 0">'+(a.score>0?'+':'')+a.score+'</div><div style="display:inline-flex;padding:4px 12px;background:rgba(37,99,235,0.06);border-radius:6px;font-weight:600;font-size:13px;margin-bottom:16px">'+(a.funnel_stage||'—')+'</div><div style="font-size:14px;color:var(--ink2);line-height:1.8">'+(a.mechanism||a.reason||'')+'</div>';
   document.getElementById('dp').classList.add('on');document.getElementById('ov').classList.add('on');}
 
-function showActorDetail(i){const a=window._psActors?.[i];if(!a)return;const color=a.score>=0?'var(--green)':a.score<0?'var(--red)':'var(--ink4)';const arrow=a.score>=0?'↑':a.score<0?'↓':'→';
-  document.getElementById('dpC').innerHTML='<div class="dp-title">'+a.name+'</div><div style="display:flex;align-items:center;gap:12px;margin-bottom:20px"><span style="font-size:28px;font-weight:800;color:'+color+'">'+arrow+' '+(a.score>0?'+':'')+a.score+'</span></div><div style="font-size:13px;font-weight:700;margin-bottom:6px">Funnel stage</div><div style="display:inline-flex;padding:4px 12px;background:rgba(37,99,235,0.06);border-radius:6px;font-weight:600;font-size:13px;margin-bottom:16px">'+(a.funnel_stage||'—')+'</div><div style="font-size:13px;font-weight:700;margin-bottom:6px">Why?</div><div style="font-size:14px;color:var(--ink2);line-height:1.7">'+(a.mechanism||a.reason||'—')+'</div>';
-  document.getElementById('dp').classList.add('on');document.getElementById('ov').classList.add('on');}
-
-function scenarioAction(){const sec=AS();if(SCEN(sec.id).length)evalScenarios();else genScenarios()}
-function regenScenarios(){const sec=AS();if(!confirm('Regenerate from all '+UCf(sec.id).length+' signals?'))return;DB.del('sc_'+sec.id);renderSc();genScenarios()}
+function scenarioAction(){if(SCEN(AS().id).length)evalScenarios();else genScenarios()}
+function regenScenarios(){const n=UCf(AS().id).length;if(!confirm('Regenerate from '+n+' signals?'))return;DB.del('sc_'+AS().id);renderSc();genScenarios()}
 
 async function genScenarios(){
   if(!DB.get('apiKey'))return toast('⚠ Key needed');const sec=AS();const uc=UCf(sec.id);if(!uc.length)return toast('Run pipeline first');
   const btn=document.getElementById('scActionBtn');btn.disabled=true;btn.textContent='⟳ Generating...';
-  const top=uc.sort((a,b)=>prio(b).sc-prio(a).sc).slice(0,25);const signalList=top.map(u=>u.co+' : '+u.title+' ('+u.ev+')').join('\n');
-  const byCo={};uc.forEach(u=>{if(u.co&&u.co!=='—')byCo[u.co]=(byCo[u.co]||0)+1});const topCos=Object.entries(byCo).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([n,c])=>n+'('+c+')').join(', ');
-  try{const raw=await aiSc('You are a senior strategy consultant in travel distribution. Build forward-looking scenarios. Be specific, cite companies. No jargon.','Sector: '+sec.name+'\nTotal: '+uc.length+' signals, '+uc.filter(u=>['Deployed','Scaled'].includes(u.ev)).length+' deployed\nTop: '+topCos+'\n\nSignals:\n'+signalList+'\n\nBuild 3 scenarios answering "What if...?"\nFor each: name (max 8 words), description (2-3 sentences with companies), key_drivers (3 facts), winners, losers, probability (low/medium/high), signals_that_would_confirm (2-3 future events), signals_that_would_invalidate (2-3 future events)\n\nReturn ONLY JSON:\n[{"name":"","description":"","key_drivers":["","",""],"winners":[""],"losers":[""],"probability":"","signals_that_would_confirm":["",""],"signals_that_would_invalidate":["",""]}]',3000);
-    const sc=pJ(raw);sc.forEach(s=>{s.created=new Date().toISOString();s.last_eval=new Date().toISOString();s.history=[{d:new Date().toISOString(),p:s.probability==='high'?.85:s.probability==='medium'?.5:.2}];s.confirm_criteria=s.signals_that_would_confirm||[];s.invalidate_criteria=s.signals_that_would_invalidate||[];s.confirming_signals='';s.invalidating_signals='';s.uc_count=uc.length});
+  const top=uc.sort((a,b)=>prio(b).sc-prio(a).sc).slice(0,25);const sigs=top.map(u=>u.co+': '+u.title+' ('+u.ev+')').join('\n');
+  const byCo={};uc.forEach(u=>{if(u.co&&u.co!=='—')byCo[u.co]=(byCo[u.co]||0)+1});
+  const topCos=Object.entries(byCo).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([n,c])=>n+'('+c+')').join(', ');
+  const dep=uc.filter(u=>['Deployed','Scaled'].includes(u.ev)).length;
+  try{const raw=await aiSc(
+    'You are a senior strategy consultant in travel distribution. Write analytically like McKinsey — specific, fact-based, citing companies. No jargon, no vague statements.',
+    'Sector: '+sec.name+' | '+uc.length+' signals, '+dep+' deployed | Top: '+topCos+'\n\nSignals:\n'+sigs+'\n\nBuild 3 scenarios. For each provide:\n- name: max 8 words, "What if...?" style\n- description: 2 sentences with company names\n- rationale: 2-3 analytical paragraphs (consulting style) explaining WHY this scenario is at this probability. Cite specific companies and signals. Connect the dots between different signals.\n- probability: low/medium/high\n- supporting_signals: list of specific signals that support this thesis\n- contradicting_signals: list of specific signals that challenge this thesis\n\nReturn ONLY JSON:\n[{"name":"","description":"","rationale":"2-3 paragraphs","probability":"","supporting_signals":["signal 1","signal 2"],"contradicting_signals":["signal 1","signal 2"]}]',4000);
+    const sc=pJ(raw);const now=new Date().toISOString();const pVal=s=>s.probability==='high'?.85:s.probability==='medium'?.5:.2;
+    sc.forEach(s=>{s.created=now;s.last_eval=now;s.history=[{d:now,p:pVal(s)}];s.confirming_signals=(s.supporting_signals||[]).join('; ');s.invalidating_signals=(s.contradicting_signals||[]).join('; ');s.uc_count=uc.length});
     DB.set('sc_'+sec.id,sc);renderSc();toast('✓ '+sc.length+' scenarios');
   }catch(e){toast('⚠ '+e.message)}btn.disabled=false;renderSc()}
 
 async function evalScenarios(){
   if(!DB.get('apiKey'))return toast('⚠');const sec=AS();const sc=SCEN(sec.id);const uc=UCf(sec.id);if(!sc.length||!uc.length)return toast('Need scenarios + data');
-  const btn=document.getElementById('scActionBtn');btn.disabled=true;btn.textContent='⟳ Re-evaluating...';
-  const signalList=uc.sort((a,b)=>prio(b).sc-prio(a).sc).slice(0,20).map(u=>u.co+' : '+u.title+' ('+u.ev+')').join('\n');
-  const scDesc=sc.map((s,i)=>(i+1)+'. '+s.name+' ('+s.probability+')\n   Confirm: '+(s.confirm_criteria||[]).join('; ')+'\n   Invalidate: '+(s.invalidate_criteria||[]).join('; ')).join('\n');
-  try{const raw=await aiSc('Re-evaluate scenarios. Check signals vs criteria. Cite companies.','Scenarios:\n'+scDesc+'\n\nSignals ('+uc.length+'):\n'+signalList+'\n\nFor each: probability, this_week_confirms, this_week_challenges\nReturn ONLY JSON: [{"index":0,"probability":"","this_week_confirms":"","this_week_challenges":""}]',2048);
-    const ev=pJ(raw);ev.forEach(e=>{const s=sc[e.index];if(!s)return;s.probability=e.probability;s.confirming_signals=e.this_week_confirms||'';s.invalidating_signals=e.this_week_challenges||'';s.last_eval=new Date().toISOString();if(!s.history)s.history=[];s.history.push({d:new Date().toISOString(),p:e.probability==='high'?.85:e.probability==='medium'?.5:.2})});
-    DB.set('sc_'+sec.id,sc);renderSc();toast('✓ Re-evaluated');
+  const btn=document.getElementById('scActionBtn');btn.disabled=true;btn.textContent='⟳ Evaluating...';
+  const sigs=uc.sort((a,b)=>prio(b).sc-prio(a).sc).slice(0,20).map(u=>u.co+': '+u.title+' ('+u.ev+')').join('\n');
+  const scDesc=sc.map((s,i)=>(i+1)+'. '+s.name+' ('+s.probability+')').join('\n');
+  try{const raw=await aiSc(
+    'Re-evaluate strategic scenarios. Write analytically, cite specific companies and signals.',
+    'Scenarios:\n'+scDesc+'\n\nSignals ('+uc.length+'):\n'+sigs+'\n\nFor each scenario:\n- probability: low/medium/high\n- rationale: 1 analytical paragraph explaining the updated probability\n- supporting_signals: specific signals supporting\n- contradicting_signals: specific signals contradicting\n\nReturn ONLY JSON:\n[{"index":0,"probability":"","rationale":"","supporting_signals":[""],"contradicting_signals":[""]}]',3000);
+    const ev=pJ(raw);const now=new Date().toISOString();const pVal=p=>p==='high'?.85:p==='medium'?.5:.2;
+    ev.forEach(e=>{const s=sc[e.index];if(!s)return;s.probability=e.probability;s.rationale=e.rationale||s.rationale;s.confirming_signals=(e.supporting_signals||[]).join('; ');s.invalidating_signals=(e.contradicting_signals||[]).join('; ');s.last_eval=now;if(!s.history)s.history=[];s.history.push({d:now,p:pVal(e.probability)})});
+    DB.set('sc_'+sec.id,sc);renderSc();toast('✓ Updated');
   }catch(e){toast('⚠ '+e.message)}btn.disabled=false;renderSc()}
 
 async function runPowerShift(){
   if(!DB.get('apiKey'))return toast('⚠');const sec=AS();const uc=UCf(sec.id);if(!uc.length)return toast('No signals');
   const btn=document.getElementById('psBtn');btn.disabled=true;btn.textContent='⟳...';
-  const signalList=uc.sort((a,b)=>prio(b).sc-prio(a).sc).slice(0,20).map(u=>u.co+' : '+u.title+' ('+u.ev+')').join('\n');
-  try{const raw=await aiSc('Analyze power shifts in travel distribution. Cite companies. Be specific.','Sector: '+sec.name+'\nActors: '+POWER_ACTORS.join(', ')+'\nSignals ('+uc.length+'):\n'+signalList+'\n\nFor EACH actor: direction (gaining/losing/stable), score (-100 to +100), funnel_stage, mechanism (1 sentence with companies)\nPlus 2-sentence summary.\n\nReturn ONLY JSON: {"summary":"","actors":[{"name":"","direction":"","score":0,"funnel_stage":"","mechanism":""}]}',2048);
+  const sigs=uc.sort((a,b)=>prio(b).sc-prio(a).sc).slice(0,20).map(u=>u.co+': '+u.title+' ('+u.ev+')').join('\n');
+  try{const raw=await aiSc(
+    'Analyze power dynamics in travel distribution. Cite companies.',
+    'Actors: '+POWER_ACTORS.join(', ')+'\nSignals ('+uc.length+'):\n'+sigs+'\n\nFor each: name, direction (gaining/losing/stable), score (-100 to +100), funnel_stage, mechanism (1 sentence)\nPlus summary (2 sentences).\n\nJSON only: {"summary":"","actors":[{"name":"","direction":"","score":0,"funnel_stage":"","mechanism":""}]}',2048);
     const ps=pJ(raw);DB.set('ps_'+sec.id,ps);renderPS(ps);toast('✓');
   }catch(e){toast('⚠ '+e.message)}btn.disabled=false;btn.textContent='🤖 Analyze'}
 
 function renderPS(ps){if(!ps?.actors)return;document.getElementById('psSummary').innerHTML=ps.summary||'';
-  const g=ps.actors.filter(a=>a.score>0).sort((a,b)=>b.score-a.score);const l=ps.actors.filter(a=>a.score<0).sort((a,b)=>a.score-b.score);const st=ps.actors.filter(a=>a.score===0);
-  function grp(actors,label,color,arrow){if(!actors.length)return'';return'<div style="margin-bottom:16px"><div style="font-size:13px;font-weight:700;color:'+color+';margin-bottom:8px">'+arrow+' '+label+'</div><table style="width:100%;border-collapse:collapse"><thead><tr style="border-bottom:2px solid var(--border)"><th style="text-align:left;font-size:10px;font-weight:700;color:var(--ink3);padding:8px 10px;text-transform:uppercase">Actor</th><th style="text-align:left;font-size:10px;font-weight:700;color:var(--ink3);padding:8px 10px;text-transform:uppercase">Funnel</th><th style="text-align:left;font-size:10px;font-weight:700;color:var(--ink3);padding:8px 10px;text-transform:uppercase">Why</th><th style="text-align:right;font-size:10px;font-weight:700;color:var(--ink3);padding:8px 10px;width:50px">Score</th></tr></thead><tbody>'+actors.map(a=>'<tr style="border-bottom:1px solid var(--border)"><td style="padding:10px;font-size:13px;font-weight:600">'+a.name+'</td><td style="padding:10px"><span style="background:rgba(37,99,235,0.06);padding:2px 8px;border-radius:4px;font-weight:600;font-size:11px">'+(a.funnel_stage||'—')+'</span></td><td style="padding:10px;font-size:12px;color:var(--ink2);line-height:1.5">'+(a.mechanism||a.reason||'')+'</td><td style="padding:10px;text-align:right;font-weight:700;color:'+color+'">'+(a.score>0?'+':'')+a.score+'</td></tr>').join('')+'</tbody></table></div>';}
-  document.getElementById('psChart').innerHTML=grp(g,'Gaining power','var(--green)','↑')+grp(l,'Losing power','var(--red)','↓')+grp(st,'Stable','var(--ink4)','→');}
+  const g=ps.actors.filter(a=>a.score>0).sort((a,b)=>b.score-a.score);const l=ps.actors.filter(a=>a.score<0).sort((a,b)=>a.score-b.score);
+  function grp(actors,label,color,arrow){if(!actors.length)return'';return'<div style="margin-bottom:16px"><div style="font-size:13px;font-weight:700;color:'+color+';margin-bottom:8px">'+arrow+' '+label+'</div><table style="width:100%;border-collapse:collapse"><thead><tr style="border-bottom:2px solid var(--border)"><th style="text-align:left;font-size:10px;font-weight:700;color:var(--ink3);padding:8px 10px;text-transform:uppercase">Actor</th><th style="text-align:left;font-size:10px;font-weight:700;color:var(--ink3);padding:8px 10px;text-transform:uppercase">Funnel</th><th style="text-align:left;font-size:10px;font-weight:700;color:var(--ink3);padding:8px 10px;text-transform:uppercase">Why</th><th style="text-align:right;font-size:10px;font-weight:700;color:var(--ink3);padding:8px 10px;width:50px">Score</th></tr></thead><tbody>'+actors.map(a=>'<tr style="border-bottom:1px solid var(--border)"><td style="padding:10px;font-size:13px;font-weight:600">'+a.name+'</td><td style="padding:10px"><span style="background:rgba(37,99,235,0.06);padding:2px 8px;border-radius:4px;font-weight:600;font-size:11px">'+(a.funnel_stage||'—')+'</span></td><td style="padding:10px;font-size:12px;color:var(--ink2);line-height:1.5">'+(a.mechanism||'')+'</td><td style="padding:10px;text-align:right;font-weight:700;color:'+color+'">'+(a.score>0?'+':'')+a.score+'</td></tr>').join('')+'</tbody></table></div>';}
+  document.getElementById('psChart').innerHTML=grp(g,'Gaining power','var(--green)','↑')+grp(l,'Losing power','var(--red)','↓');}
 
-// ═══ TEST CUSTOM SCENARIOS ═══
-function renderTestSc(){const sec=AS();const saved=DB.get('tsc_'+sec.id)||[];const el=document.getElementById('testScSaved');const info=document.getElementById('testScInfo');
-  if(info)info.textContent=UCf(sec.id).length+' signals available';
-  if(!saved.length){el.innerHTML='<div style="color:var(--ink3);font-size:13px">No tested scenarios yet</div>';return;}
+// ═══ TEST SCENARIOS — multi-line ═══
+let testScLines=[''];
+function renderTestSc(){
+  const sec=AS();const uc=UCf(sec.id);const info=document.getElementById('testScInfo');if(info)info.textContent=uc.length+' signals';
+  // Render input lines
+  const linesEl=document.getElementById('testScLines');
+  if(linesEl)linesEl.innerHTML=testScLines.map((v,i)=>'<div style="display:flex;gap:8px;margin-bottom:6px;align-items:center"><span style="font-size:12px;font-weight:700;color:var(--ink4);width:20px;flex-shrink:0">'+(i+1)+'</span><input value="'+v.replace(/"/g,'&quot;')+'" oninput="testScLines['+i+']=this.value" placeholder="e.g. Google becomes the main booking channel..." style="flex:1;font-size:13px;padding:8px 12px;border-radius:8px" />'+(testScLines.length>1?'<button onclick="testScLines.splice('+i+',1);renderTestSc()" style="border:0;background:0;cursor:pointer;font-size:14px;color:var(--ink4);padding:4px">✕</button>':'')+'</div>').join('');
+  // Render saved results
+  const saved=DB.get('tsc_'+sec.id)||[];const el=document.getElementById('testScSaved');
+  if(!saved.length){el.innerHTML='<div style="color:var(--ink3);font-size:13px">No tests yet</div>';return}
   el.innerHTML=saved.map((s,i)=>{const pc=s.probability==='high'?'var(--red)':s.probability==='medium'?'var(--orange)':'var(--ink4)';
-    return'<div class="card" style="margin-bottom:10px;cursor:pointer" onclick="showTestScDetail('+i+')"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><span style="font-size:14px;font-weight:700">'+s.name+'</span><span style="font-size:13px;font-weight:700;color:'+pc+'">'+(s.probability||'?').toUpperCase()+'</span></div><div style="font-size:12px;color:var(--ink3);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">'+(s.analysis||'')+'</div><div style="font-size:11px;color:var(--ink4);margin-top:6px">'+new Date(s.tested_at).toLocaleDateString()+' · '+s.uc_count+' signals</div></div>';}).join('');}
+    return'<div class="card" style="margin-bottom:10px;cursor:pointer" onclick="showTestDetail('+i+')"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-size:14px;font-weight:700">'+s.name+'</span><span style="font-weight:700;color:'+pc+'">'+(s.probability||'?').toUpperCase()+'</span></div><div style="font-size:12px;color:var(--ink3);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">'+(s.analysis||'')+'</div><div style="font-size:11px;color:var(--ink4);margin-top:4px">'+new Date(s.tested_at).toLocaleDateString()+' · '+s.uc_count+' signals</div></div>';}).join('');
+}
+function addTestScLine(){testScLines.push('');renderTestSc()}
 
-async function testCustomScenario(){if(!DB.get('apiKey'))return toast('⚠');const input=document.getElementById('testScInput')?.value?.trim();if(!input)return toast('Write a hypothesis');
-  const sec=AS();const uc=UCf(sec.id);if(!uc.length)return toast('No signals');const btn=document.getElementById('testScBtn');btn.disabled=true;btn.textContent='⟳ Analyzing...';
-  const signalList=uc.sort((a,b)=>prio(b).sc-prio(a).sc).slice(0,25).map(u=>u.co+' : '+u.title+' ('+u.ev+')').join('\n');
-  try{const raw=await aiSc('You evaluate a strategic hypothesis against market signals. Be specific, cite companies, write analytically.','HYPOTHESIS: "'+input+'"\n\nDATA: '+uc.length+' signals\nSignals:\n'+signalList+'\n\nAnalyze:\n1. name (short)\n2. probability: low/medium/high\n3. analysis: 2-3 analytical paragraphs citing companies\n4. supporting: specific supporting signals\n5. contradicting: specific contradicting signals\n\nReturn ONLY JSON: {"name":"","probability":"","analysis":"","supporting":[""],"contradicting":[""]}',3000);
-    const result=pJ(raw);result.hypothesis=input;result.tested_at=new Date().toISOString();result.uc_count=uc.length;
-    const saved=DB.get('tsc_'+sec.id)||[];saved.unshift(result);DB.set('tsc_'+sec.id,saved.slice(0,20));
-    document.getElementById('testScResults').innerHTML='<div class="card" style="margin-bottom:16px;border-left:3px solid var(--accent)"><div style="font-family:var(--serif);font-size:16px;margin-bottom:12px">'+result.name+'</div><div style="display:inline-flex;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;background:rgba(0,0,0,0.04);color:'+(result.probability==='high'?'var(--red)':result.probability==='medium'?'var(--orange)':'var(--ink4)')+'">'+result.probability.toUpperCase()+'</div><div style="font-size:14px;color:var(--ink2);line-height:1.8;margin:16px 0">'+(result.analysis||'').replace(/\n/g,'<br>')+'</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'+(result.supporting?.length?'<div><div style="font-size:11px;font-weight:700;color:var(--green);margin-bottom:6px">✅ Supporting</div>'+result.supporting.map(s=>'<div style="font-size:12px;padding:2px 0">• '+s+'</div>').join('')+'</div>':'<div></div>')+(result.contradicting?.length?'<div><div style="font-size:11px;font-weight:700;color:var(--red);margin-bottom:6px">❌ Contradicting</div>'+result.contradicting.map(s=>'<div style="font-size:12px;padding:2px 0">• '+s+'</div>').join('')+'</div>':'<div></div>')+'</div></div>';
-    renderTestSc();toast('✓ Tested');
-  }catch(e){toast('⚠ '+e.message)}btn.disabled=false;btn.textContent='🧠 Test against all signals'}
+async function testAllScenarios(){
+  if(!DB.get('apiKey'))return toast('⚠');const hypotheses=testScLines.filter(l=>l.trim());if(!hypotheses.length)return toast('Write at least one hypothesis');
+  const sec=AS();const uc=UCf(sec.id);if(!uc.length)return toast('No signals');
+  const btn=document.getElementById('testScBtn');btn.disabled=true;btn.textContent='⟳ Testing '+hypotheses.length+'...';
+  const sigs=uc.sort((a,b)=>prio(b).sc-prio(a).sc).slice(0,25).map(u=>u.co+': '+u.title+' ('+u.ev+')').join('\n');
+  try{const raw=await aiSc(
+    'You evaluate strategic hypotheses against market signals. Write analytically like McKinsey. Cite specific companies.',
+    'HYPOTHESES:\n'+hypotheses.map((h,i)=>(i+1)+'. '+h).join('\n')+'\n\nDATA: '+uc.length+' signals\nSignals:\n'+sigs+'\n\nFor EACH hypothesis, provide:\n- name: short title\n- hypothesis: the original text\n- probability: low/medium/high\n- analysis: 2 analytical paragraphs citing companies and signals\n- supporting: list of supporting signals\n- contradicting: list of contradicting signals\n\nReturn ONLY JSON array:\n[{"name":"","hypothesis":"","probability":"","analysis":"","supporting":[""],"contradicting":[""]}]',4000);
+    const results=pJ(raw);const now=new Date().toISOString();
+    const saved=DB.get('tsc_'+sec.id)||[];
+    (Array.isArray(results)?results:[results]).forEach(r=>{r.tested_at=now;r.uc_count=uc.length;saved.unshift(r)});
+    DB.set('tsc_'+sec.id,saved.slice(0,30));
+    // Show results
+    const resEl=document.getElementById('testScResults');
+    resEl.innerHTML=(Array.isArray(results)?results:[results]).map(r=>{const pc=r.probability==='high'?'var(--red)':r.probability==='medium'?'var(--orange)':'var(--ink4)';
+      return'<div class="card" style="margin-bottom:12px;border-left:3px solid var(--accent)"><div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-family:var(--serif);font-size:16px">'+r.name+'</span><span style="font-weight:700;color:'+pc+'">'+( r.probability||'?').toUpperCase()+'</span></div><div style="font-size:14px;color:var(--ink2);line-height:1.8;margin-bottom:16px">'+(r.analysis||'').replace(/\n/g,'<br>')+'</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">'+(r.supporting?.length?'<div><div style="font-size:11px;font-weight:700;color:var(--green);margin-bottom:6px;padding-bottom:4px;border-bottom:2px solid var(--green)">Supporting</div>'+r.supporting.map(s=>'<div style="font-size:12px;padding:4px 0;border-bottom:1px solid rgba(22,163,74,0.1)">✅ '+s+'</div>').join('')+'</div>':'')+(r.contradicting?.length?'<div><div style="font-size:11px;font-weight:700;color:var(--red);margin-bottom:6px;padding-bottom:4px;border-bottom:2px solid var(--red)">Contradicting</div>'+r.contradicting.map(s=>'<div style="font-size:12px;padding:4px 0;border-bottom:1px solid rgba(220,38,38,0.1)">❌ '+s+'</div>').join('')+'</div>':'')+'</div></div>';
+    }).join('');
+    renderTestSc();toast('✓ '+results.length+' hypotheses tested');
+  }catch(e){toast('⚠ '+e.message)}btn.disabled=false;btn.textContent='🧠 Test all against signals'}
 
-function showTestScDetail(i){const sec=AS();const s=(DB.get('tsc_'+sec.id)||[])[i];if(!s)return;const pc=s.probability==='high'?'var(--red)':s.probability==='medium'?'var(--orange)':'var(--ink4)';
-  document.getElementById('dpC').innerHTML='<div class="dp-title">'+s.name+'</div><div style="font-size:12px;color:var(--ink3);margin-bottom:16px">Hypothesis: "'+s.hypothesis+'"</div><div style="display:inline-flex;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;margin-bottom:16px;background:rgba(0,0,0,0.04);color:'+pc+'">'+(s.probability||'?').toUpperCase()+'</div><div style="font-size:14px;color:var(--ink2);line-height:1.8;margin-bottom:16px">'+(s.analysis||'').replace(/\n/g,'<br>')+'</div>'+(s.supporting?.length?'<div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:var(--green);margin-bottom:6px">✅ Supporting</div>'+s.supporting.map(x=>'<div style="font-size:12px;padding:2px 0">• '+x+'</div>').join('')+'</div>':'')+(s.contradicting?.length?'<div><div style="font-size:11px;font-weight:700;color:var(--red);margin-bottom:6px">❌ Contradicting</div>'+s.contradicting.map(x=>'<div style="font-size:12px;padding:2px 0">• '+x+'</div>').join('')+'</div>':'')+'<div style="font-size:11px;color:var(--ink4);margin-top:16px">'+new Date(s.tested_at).toLocaleDateString()+' · '+s.uc_count+' signals</div>';
+function showTestDetail(i){const s=(DB.get('tsc_'+AS().id)||[])[i];if(!s)return;const pc=s.probability==='high'?'var(--red)':s.probability==='medium'?'var(--orange)':'var(--ink4)';
+  document.getElementById('dpC').innerHTML='<div class="dp-title">'+s.name+'</div><div style="font-size:12px;color:var(--ink3);margin-bottom:16px">"'+( s.hypothesis||'')+'"</div><div style="font-weight:700;color:'+pc+';margin-bottom:16px">'+( s.probability||'?').toUpperCase()+' PROBABILITY</div><div style="font-size:14px;color:var(--ink2);line-height:1.8;margin-bottom:16px">'+(s.analysis||'').replace(/\n/g,'<br>')+'</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">'+(s.supporting?.length?'<div><div style="font-size:11px;font-weight:700;color:var(--green);margin-bottom:6px;border-bottom:2px solid var(--green);padding-bottom:4px">Supporting</div>'+s.supporting.map(x=>'<div style="font-size:12px;padding:4px 0">✅ '+x+'</div>').join('')+'</div>':'')+(s.contradicting?.length?'<div><div style="font-size:11px;font-weight:700;color:var(--red);margin-bottom:6px;border-bottom:2px solid var(--red);padding-bottom:4px">Contradicting</div>'+s.contradicting.map(x=>'<div style="font-size:12px;padding:4px 0">❌ '+x+'</div>').join('')+'</div>':'')+'</div>';
   document.getElementById('dp').classList.add('on');document.getElementById('ov').classList.add('on');}
-
-// Heatmap
-function renderHeatmap(){
-  const sec=AS();const uc=UCf(sec.id);const el=document.getElementById('heatmapWrap');
-  if(!uc.length||!uc.some(u=>u.pil)){el.innerHTML='<div style="color:var(--ink3);text-align:center;padding:32px">Run V4 pipeline to populate</div>';return}
   const byC={};uc.forEach(u=>{if(u.co&&u.co!=='—')(byC[u.co]=byC[u.co]||[]).push(u)});
   const cos=Object.entries(byC).sort((a,b)=>b[1].length-a[1].length).slice(0,15).map(([n])=>n);
   const matrix={};cos.forEach(c=>{matrix[c]={1:0,2:0,3:0,4:0};byC[c].forEach(u=>{if(u.pil)matrix[c][u.pil]++})});
