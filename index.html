@@ -869,48 +869,55 @@ function renderSc(){
   // Power shift
   const ps=PS(sec.id);if(ps)renderPS(ps);
 }
-// Scenario detail in side panel — clean and scannable
+// Scenario detail — follows Thomas framework section 6 exactly
 function showScDetail(i){
   const s=window._scenarios[i];if(!s)return;
   const probColor=s.probability==='high'?'var(--red)':s.probability==='medium'?'var(--orange)':'var(--ink4)';
   const probPct=s.probability==='high'?85:s.probability==='medium'?50:20;
-  const probLabel=s.probability==='high'?'Très probable':s.probability==='medium'?'Probable':'Peu probable';
 
   document.getElementById('dpC').innerHTML=
-    // Title + probability
-    '<div class="dp-title" style="margin-bottom:4px">'+s.name+'</div>'
-    +'<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">'
+    '<div class="dp-title" style="margin-bottom:16px">'+s.name+'</div>'
+
+    // Probability bar
+    +'<div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">'
       +'<div style="flex:1;height:8px;background:var(--bg);border-radius:4px;overflow:hidden"><div style="width:'+probPct+'%;height:100%;background:'+probColor+';border-radius:4px"></div></div>'
-      +'<span style="font-size:13px;font-weight:700;color:'+probColor+'">'+probPct+'% — '+probLabel+'</span>'
+      +'<span style="font-size:13px;font-weight:700;color:'+probColor+'">'+s.probability.toUpperCase()+'</span>'
     +'</div>'
 
-    // What is this scenario — 2 sentences max
-    +'<div style="font-size:14px;color:var(--ink);line-height:1.7;margin-bottom:24px;padding:16px;background:var(--bg);border-radius:10px">'+s.description+'</div>'
+    // Description
+    +'<div style="font-size:14px;color:var(--ink);line-height:1.7;margin-bottom:24px">'+s.description+'</div>'
 
-    // Why we think this — drivers as numbered list
-    +'<div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:10px">Pourquoi ce scénario ?</div>'
-    +(s.drivers||[]).map((d,j)=>'<div style="display:flex;gap:10px;margin-bottom:8px;font-size:13px;color:var(--ink2);line-height:1.5"><span style="font-weight:700;color:var(--accent);flex-shrink:0">'+(j+1)+'.</span><span>'+d+'</span></div>').join('')
+    // Key Drivers (numbered)
+    +'<div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:8px">Key Drivers</div>'
+    +(s.key_drivers||s.drivers||[]).map((d,j)=>'<div style="display:flex;gap:8px;margin-bottom:6px;font-size:13px;color:var(--ink2);line-height:1.5"><span style="font-weight:700;color:var(--accent);flex-shrink:0">'+(j+1)+'</span>'+d+'</div>').join('')
 
-    // This week's evidence — FOR and AGAINST side by side
+    // Winners / Losers — simple table
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:20px 0">'
-      +'<div style="border-radius:10px;padding:14px;border:1.5px solid rgba(22,163,74,0.2);background:rgba(22,163,74,0.03)">'
-        +'<div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:8px">✅ Ce qui confirme</div>'
-        +'<div style="font-size:13px;color:var(--ink2);line-height:1.6">'+(s.confirming_signals||'Pas encore de signaux')+'</div>'
+      +'<div><div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:8px">↑ Winners</div>'+(s.winners||[]).map(w=>'<div style="font-size:13px;padding:3px 0;color:var(--ink2)">'+w+'</div>').join('')+'</div>'
+      +'<div><div style="font-size:12px;font-weight:700;color:var(--red);margin-bottom:8px">↓ Losers</div>'+(s.losers||[]).map(l=>'<div style="font-size:13px;padding:3px 0;color:var(--ink2)">'+l+'</div>').join('')+'</div>'
+    +'</div>'
+
+    // Confirmation / Invalidation CRITERIA (what would confirm/invalidate — not what happened this week)
+    +'<div style="margin:20px 0;padding:16px;background:var(--bg);border-radius:10px">'
+      +'<div style="font-size:12px;font-weight:700;color:var(--ink);margin-bottom:10px">Signaux à surveiller</div>'
+      +'<div style="margin-bottom:10px"><div style="font-size:11px;font-weight:700;color:var(--green);margin-bottom:4px">✅ Confirmerait ce scénario :</div>'
+        +(s.confirm_criteria||s.signals_that_would_confirm||[]).map(c=>'<div style="font-size:12px;color:var(--ink2);padding:2px 0;padding-left:16px">• '+c+'</div>').join('')
       +'</div>'
-      +'<div style="border-radius:10px;padding:14px;border:1.5px solid rgba(220,38,38,0.2);background:rgba(220,38,38,0.03)">'
-        +'<div style="font-size:12px;font-weight:700;color:var(--red);margin-bottom:8px">❌ Ce qui contredit</div>'
-        +'<div style="font-size:13px;color:var(--ink2);line-height:1.6">'+(s.invalidating_signals||'Pas encore de signaux')+'</div>'
+      +'<div><div style="font-size:11px;font-weight:700;color:var(--red);margin-bottom:4px">❌ Invaliderait ce scénario :</div>'
+        +(s.invalidate_criteria||s.signals_that_would_invalidate||[]).map(c=>'<div style="font-size:12px;color:var(--ink2);padding:2px 0;padding-left:16px">• '+c+'</div>').join('')
       +'</div>'
     +'</div>'
 
-    // Winners / Losers — simple two columns
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
-      +'<div><div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:6px">↑ Qui en profite</div>'+(s.winners||[]).map(w=>'<div style="font-size:13px;padding:3px 0;color:var(--ink2)">• '+w+'</div>').join('')+'</div>'
-      +'<div><div style="font-size:12px;font-weight:700;color:var(--red);margin-bottom:6px">↓ Qui est menacé</div>'+(s.losers||[]).map(l=>'<div style="font-size:13px;padding:3px 0;color:var(--ink2)">• '+l+'</div>').join('')+'</div>'
-    +'</div>'
+    // This week's evidence (only if re-evaluated)
+    +(s.confirming_signals||s.invalidating_signals?
+      '<div style="font-size:12px;font-weight:700;color:var(--ink);margin-bottom:8px">Cette semaine</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">'
+        +(s.confirming_signals?'<div style="font-size:12px;color:var(--green);line-height:1.5">✅ '+s.confirming_signals+'</div>':'<div></div>')
+        +(s.invalidating_signals?'<div style="font-size:12px;color:var(--red);line-height:1.5">❌ '+s.invalidating_signals+'</div>':'<div></div>')
+      +'</div>'
+    :'')
 
-    // Last eval date
-    +(s.last_eval?'<div style="margin-top:20px;font-size:11px;color:var(--ink4)">Dernière évaluation : '+new Date(s.last_eval).toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})+'</div>':'');
+    +(s.last_eval?'<div style="font-size:11px;color:var(--ink4);margin-top:16px">Dernière évaluation : '+new Date(s.last_eval).toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})+(s.uc_count?' · basé sur '+s.uc_count+' signaux':'')+'</div>':'');
 
   document.getElementById('dp').classList.add('on');document.getElementById('ov').classList.add('on');
 }
@@ -920,18 +927,22 @@ function regenScenarios(){const sec=AS();if(!confirm('Regenerate scenarios from 
 async function genScenarios(){
   if(!DB.get('apiKey'))return toast('⚠ Key needed');const sec=AS();const uc=UCf(sec.id);if(!uc.length)return toast('Run pipeline first');
   const btn=document.getElementById('scActionBtn');btn.disabled=true;btn.textContent='⟳ Generating...';
-  // Build a comprehensive summary of ALL data, not just 15
   const top=uc.sort((a,b)=>prio(b).sc-prio(a).sc).slice(0,25);
   const signalList=top.map(u=>u.co+' : '+u.title+' ('+u.ev+')').join('\n');
-  // Count by company
   const byCo={};uc.forEach(u=>{if(u.co&&u.co!=='—')byCo[u.co]=(byCo[u.co]||0)+1});
-  const topCos=Object.entries(byCo).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([n,c])=>n+' ('+c+' signals)').join(', ');
+  const topCos=Object.entries(byCo).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([n,c])=>n+' ('+c+')').join(', ');
   const deployed=uc.filter(u=>['Deployed','Scaled'].includes(u.ev)).length;
   try{const raw=await ai(
-    'You are a senior strategy consultant. You write clearly for executives who have 30 seconds to read. NEVER use internal codes, abbreviations, or jargon. Write in plain, clear English that a CEO would understand.',
-    'Sector: '+sec.name+'\n\nDATABASE SUMMARY: '+uc.length+' AI signals total, '+deployed+' already deployed.\nMost active companies: '+topCos+'\n\nTOP 25 SIGNALS (by importance):\n'+signalList+'\n\nBased on ALL '+uc.length+' signals, create 3 strategic scenarios about the future of this sector.\n\nEach scenario should answer: "What if [this specific thing] happens?"\nExamples: "What if Google becomes the main booking channel?" or "What if hotels bypass OTAs using AI?"\n\nRULES:\n- Scenario names: short, crystal clear (max 8 words)\n- Description: 2 plain sentences explaining what would happen\n- Drivers: 3 concrete reasons WHY (real facts from the signals)\n- Winners/Losers: which types of companies benefit or suffer\n- Probability: low, medium, or high\n- Evidence FOR: 1-2 concrete recent facts from signals above (news headline style)\n- Evidence AGAINST: 1-2 facts that challenge this (news headline style)\n\nReturn ONLY valid JSON array:\n[{"name":"short title","description":"2 sentences","drivers":["reason1","reason2","reason3"],"winners":["who"],"losers":["who"],"probability":"low|medium|high","evidence_for":"facts supporting","evidence_against":"facts challenging"}]',
-    2048);
-    const sc=pJ(raw);sc.forEach(s=>{s.created=new Date().toISOString();s.last_eval=new Date().toISOString();s.history=[{d:new Date().toISOString(),p:s.probability==='high'?.85:s.probability==='medium'?.5:.2}];s.confirming_signals=s.evidence_for||s.confirming_signals||'';s.invalidating_signals=s.evidence_against||s.invalidating_signals||'';s.uc_count=uc.length;});
+    'You are a senior strategy consultant specialized in travel distribution and AI. You build forward-looking scenarios. Be specific. Cite real companies. No jargon. No vague statements.',
+    'Sector: '+sec.name+'\nTotal: '+uc.length+' signals, '+deployed+' deployed\nTop companies: '+topCos+'\n\nTop 25 signals:\n'+signalList+'\n\nBuild exactly 3 forward-looking scenarios following THIS EXACT STRUCTURE (from Thomas framework section 6):\n\nFor each scenario provide:\n- name: short, clear (max 8 words) — must answer "What if...?"\n- description: 2-3 sentences, specific, with company names\n- key_drivers: exactly 3 concrete drivers (facts, not concepts)\n- winners: list of specific types of players who benefit\n- losers: list of specific types of players who suffer\n- probability: low / medium / high\n- signals_that_would_confirm: 2-3 specific things that, if they happen next, would confirm this scenario\n- signals_that_would_invalidate: 2-3 specific things that would prove this scenario wrong\n\nIMPORTANT: "signals_that_would_confirm" and "signals_that_would_invalidate" are NOT about what happened this week. They are about what COULD happen in the future that would validate or kill the scenario.\n\nReturn ONLY valid JSON:\n[{"name":"string","description":"string","key_drivers":["3 items"],"winners":["types"],"losers":["types"],"probability":"low|medium|high","signals_that_would_confirm":["future signal 1","future signal 2"],"signals_that_would_invalidate":["future signal 1","future signal 2"]}]',
+    3000);
+    const sc=pJ(raw);sc.forEach(s=>{
+      s.created=new Date().toISOString();s.last_eval=new Date().toISOString();
+      s.history=[{d:new Date().toISOString(),p:s.probability==='high'?.85:s.probability==='medium'?.5:.2}];
+      s.confirm_criteria=s.signals_that_would_confirm||[];
+      s.invalidate_criteria=s.signals_that_would_invalidate||[];
+      s.confirming_signals='';s.invalidating_signals='';s.uc_count=uc.length;
+    });
     DB.set('sc_'+sec.id,sc);renderSc();toast('✓ '+sc.length+' scenarios (from '+uc.length+' signals)');
   }catch(e){toast('⚠ '+e.message)}btn.disabled=false;renderSc()}
 async function evalScenarios(){
@@ -939,48 +950,63 @@ async function evalScenarios(){
   const btn=document.getElementById('scActionBtn');btn.disabled=true;btn.textContent='⟳ Re-evaluating...';
   const top=uc.sort((a,b)=>prio(b).sc-prio(a).sc).slice(0,20);
   const signalList=top.map(u=>u.co+' : '+u.title+' ('+u.ev+')').join('\n');
-  const deployed=uc.filter(u=>['Deployed','Scaled'].includes(u.ev)).length;
+  const scenarioDesc=sc.map((s,i)=>(i+1)+'. '+s.name+' (currently: '+s.probability+')\n   Would CONFIRM: '+(s.confirm_criteria||[]).join('; ')+'\n   Would INVALIDATE: '+(s.invalidate_criteria||[]).join('; ')).join('\n');
   try{const raw=await ai(
-    'You re-evaluate strategic scenarios based on new evidence. Write in plain English, like a news analyst. NO jargon, NO codes.',
-    'DATABASE: '+uc.length+' total signals, '+deployed+' deployed.\n\nOur scenarios:\n'+sc.map((s,i)=>(i+1)+'. '+s.name+' (currently: '+s.probability+')').join('\n')+'\n\nTop 20 signals by importance:\n'+signalList+'\n\nFor each scenario:\n- Has the probability changed? (low/medium/high)\n- Evidence FOR: 1-2 concrete facts from signals (news headline style)\n- Evidence AGAINST: 1-2 concrete facts (news headline style)\n\nReturn ONLY valid JSON array:\n[{"index":0,"probability":"low|medium|high","evidence_for":"facts","evidence_against":"facts"}]',
+    'You re-evaluate strategic scenarios based on new signals. For each scenario, check if any new signals match the confirmation or invalidation criteria. Be specific. Cite real signals.',
+    'Scenarios with their criteria:\n'+scenarioDesc+'\n\nLatest signals ('+uc.length+' total):\n'+signalList+'\n\nFor each scenario:\n1. Has the probability changed? (low/medium/high)\n2. Which specific signals this week CONFIRM this scenario? (cite company + what happened)\n3. Which specific signals this week CHALLENGE this scenario? (cite company + what happened)\n\nReturn ONLY valid JSON:\n[{"index":0,"probability":"low|medium|high","this_week_confirms":"specific signals that confirm","this_week_challenges":"specific signals that challenge"}]',
     2048);
-    const ev=pJ(raw);ev.forEach(e=>{const s=sc[e.index];if(!s)return;s.probability=e.probability;s.confirming_signals=e.evidence_for||e.confirming_signals||'';s.invalidating_signals=e.evidence_against||e.invalidating_signals||'';s.last_eval=new Date().toISOString();if(!s.history)s.history=[];s.history.push({d:new Date().toISOString(),p:e.probability==='high'?.85:e.probability==='medium'?.5:.2})});
+    const ev=pJ(raw);ev.forEach(e=>{const s=sc[e.index];if(!s)return;s.probability=e.probability;s.confirming_signals=e.this_week_confirms||e.evidence_for||'';s.invalidating_signals=e.this_week_challenges||e.evidence_against||'';s.last_eval=new Date().toISOString();if(!s.history)s.history=[];s.history.push({d:new Date().toISOString(),p:e.probability==='high'?.85:e.probability==='medium'?.5:.2})});
     DB.set('sc_'+sec.id,sc);renderSc();toast('✓ Re-evaluated ('+uc.length+' signals)');
   }catch(e){toast('⚠ '+e.message)}btn.disabled=false;renderSc()}
 
 async function runPowerShift(){
   if(!DB.get('apiKey'))return toast('⚠');const sec=AS();const uc=UCf(sec.id);if(!uc.length)return toast('No signals');
   const btn=document.getElementById('psBtn');btn.disabled=true;btn.textContent='⟳...';
-  const signalList=uc.slice(0,15).map(u=>u.co+' : '+u.title+' ('+u.ev+')').join('\n');
+  const top=uc.sort((a,b)=>prio(b).sc-prio(a).sc).slice(0,20);
+  const signalList=top.map(u=>u.co+' : '+u.title+' ('+u.ev+')').join('\n');
+  const deployed=uc.filter(u=>['Deployed','Scaled'].includes(u.ev)).length;
   try{const raw=await ai(
-    'You analyze how AI is shifting the balance of power between different types of players in an industry. Write in plain English for executives.',
-    'Sector: '+sec.name+'\n\nThese are the types of players in this sector: '+POWER_ACTORS.join(', ')+'\n\nRecent AI signals:\n'+signalList+'\n\nBased on these signals, who is gaining power and who is losing power? For each player type, give:\n- direction: gaining, losing, or stable\n- score: from -100 (losing a lot) to +100 (gaining a lot)\n- reason: ONE clear sentence explaining why, referencing specific signals\n\nAlso write a 2-sentence summary of the overall power dynamics.\n\nReturn ONLY valid JSON:\n{"actors":[{"name":"player type","direction":"gaining|losing|stable","score":-100 to 100,"reason":"one clear sentence"}],"summary":"2 sentences"}',
+    'You are a senior travel distribution strategy consultant. You analyze how AI shifts the balance of power between players. Be specific, cite companies from the signals. Write for executives.',
+    'Sector: '+sec.name+'\nTotal signals: '+uc.length+', deployed: '+deployed+'\n\nTop signals:\n'+signalList+'\n\nAnalyze the power shift between these players:\n'+POWER_ACTORS.join('\n')+'\n\nFor EACH player, provide THREE things (this is mandatory):\n1. DIRECTION: gaining, losing, or stable\n2. FUNNEL STAGE: at which stage of the customer journey they gain or lose power (inspiration / research / booking / in-stay / post-stay / operations)\n3. WHY: the specific mechanism — HOW do they capture or lose value? Reference concrete signals.\n\nAlso provide a 2-sentence executive summary.\n\nReturn ONLY valid JSON:\n{"summary":"2 sentences","actors":[{"name":"full player name","direction":"gaining|losing|stable","score":-100 to 100,"funnel_stage":"which stage","mechanism":"1 specific sentence with company names"}]}',
     2048);
     const ps=pJ(raw);DB.set('ps_'+sec.id,ps);renderPS(ps);toast('✓');
   }catch(e){toast('⚠ '+e.message)}btn.disabled=false;btn.textContent='🤖 Analyze'}
 
-// Qui gagne, qui perd — clean bar chart with full names
+// Qui gagne, qui perd — Thomas format: who / funnel stage / why
 function renderPS(ps){
   if(!ps?.actors)return;
   const sumEl=document.getElementById('psSummary');
   const chartEl=document.getElementById('psChart');
   if(sumEl)sumEl.innerHTML=ps.summary||'';
-  const sorted=[...ps.actors].sort((a,b)=>b.score-a.score);
-  const maxAbs=Math.max(...sorted.map(a=>Math.abs(a.score)),1);
-  chartEl.innerHTML=sorted.map(a=>{
-    const isPos=a.score>=0;const barW=Math.round(Math.abs(a.score)/maxAbs*100);
-    const color=isPos?'var(--green)':'var(--red)';
-    const arrow=isPos?'↑':a.score<0?'↓':'→';
-    const reason=a.reason||a.mechanism||'';
-    return'<div style="margin-bottom:12px">'
-      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">'
-        +'<div style="display:flex;align-items:center;gap:6px"><span style="font-size:14px;font-weight:700;color:'+color+'">'+arrow+'</span><span style="font-size:13px;font-weight:600;color:var(--ink)">'+a.name+'</span></div>'
-        +'<span style="font-size:13px;font-weight:700;color:'+color+'">'+(isPos?'+':'')+a.score+'</span>'
-      +'</div>'
-      +'<div style="height:8px;background:var(--bg);border-radius:4px;overflow:hidden;margin-bottom:4px"><div style="width:'+barW+'%;height:100%;background:'+color+';border-radius:4px"></div></div>'
-      +'<div style="font-size:12px;color:var(--ink3);line-height:1.4">'+reason+'</div>'
-    +'</div>';
-  }).join('');
+  const gainers=[...ps.actors].filter(a=>a.score>0).sort((a,b)=>b.score-a.score);
+  const losers=[...ps.actors].filter(a=>a.score<0).sort((a,b)=>a.score-b.score);
+  const stable=[...ps.actors].filter(a=>a.score===0);
+
+  function renderGroup(actors,label,color,arrow){
+    if(!actors.length)return'';
+    return'<div style="margin-bottom:20px">'
+      +'<div style="font-size:13px;font-weight:700;color:'+color+';margin-bottom:10px">'+arrow+' '+label+'</div>'
+      +'<table style="width:100%;border-collapse:collapse">'
+      +'<thead><tr style="border-bottom:2px solid var(--border)">'
+        +'<th style="text-align:left;font-size:10px;font-weight:700;color:var(--ink3);padding:8px 12px;text-transform:uppercase;letter-spacing:.06em">Acteur</th>'
+        +'<th style="text-align:left;font-size:10px;font-weight:700;color:var(--ink3);padding:8px 12px;text-transform:uppercase;letter-spacing:.06em">Étape du funnel</th>'
+        +'<th style="text-align:left;font-size:10px;font-weight:700;color:var(--ink3);padding:8px 12px;text-transform:uppercase;letter-spacing:.06em">Pourquoi</th>'
+        +'<th style="text-align:right;font-size:10px;font-weight:700;color:var(--ink3);padding:8px 12px;text-transform:uppercase;letter-spacing:.06em;width:50px">Score</th>'
+      +'</tr></thead><tbody>'
+      +actors.map(a=>{
+        const mech=a.mechanism||a.reason||'';
+        const funnel=a.funnel_stage||a.funnel||'—';
+        return'<tr style="border-bottom:1px solid var(--border)">'
+          +'<td style="padding:10px 12px;font-size:13px;font-weight:600;color:var(--ink)">'+a.name+'</td>'
+          +'<td style="padding:10px 12px;font-size:12px;color:var(--ink2)"><span style="background:rgba(37,99,235,0.06);padding:2px 8px;border-radius:4px;font-weight:600;font-size:11px">'+funnel+'</span></td>'
+          +'<td style="padding:10px 12px;font-size:12px;color:var(--ink2);line-height:1.5">'+mech+'</td>'
+          +'<td style="padding:10px 12px;text-align:right;font-size:13px;font-weight:700;color:'+color+'">'+(a.score>0?'+':'')+a.score+'</td>'
+        +'</tr>';
+      }).join('')
+      +'</tbody></table></div>';
+  }
+
+  chartEl.innerHTML=renderGroup(gainers,'Gagnent du pouvoir','var(--green)','↑')+renderGroup(losers,'Perdent du pouvoir','var(--red)','↓')+renderGroup(stable,'Stables','var(--ink4)','→');
 }
 
 // Heatmap
