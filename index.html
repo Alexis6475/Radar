@@ -852,11 +852,6 @@ function renderTechMatrix(sid){
   el.innerHTML='<div style="position:absolute;inset:0;padding:8px 0"><div style="display:flex;gap:12px;margin-bottom:14px;padding-left:130px">'+mats.map(m=>'<div style="display:flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--ink3)"><span style="width:11px;height:11px;border-radius:3px;background:'+mc[m]+'"></span>'+m+'</div>').join('')+'</div>'+techs.map(([tech,ucs])=>{const ct={};ucs.forEach(u=>{ct[u.ev]=(ct[u.ev]||0)+1});return'<div style="display:flex;align-items:center;gap:10px;height:32px;margin-bottom:6px"><div style="width:120px;text-align:right;font-size:12px;font-weight:600;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+tech+'</div><div style="flex:1;display:flex;height:22px;border-radius:5px;overflow:hidden;background:var(--bg)">'+mats.map(m=>{const n=ct[m]||0;return n?'<div style="width:'+(n/mx*100)+'%;background:'+mc[m]+';display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:white;min-width:16px">'+(n>1?n:'')+'</div>':''}).join('')+'</div><div style="width:28px;text-align:right;font-size:12px;font-weight:700;color:var(--ink3)">'+ucs.length+'</div></div>'}).join('')+'</div>';
 }
 
-// ═══ SCENARIO VIEW TOGGLE ═══
-let scViewMode='scenarios';
-function setScView(mode){
-  scViewMode=mode;
-
 // ═══ SCENARIO VIEW ═══
 let scViewMode='scenarios';
 function setScView(mode){scViewMode=mode;document.getElementById('scViewSc').classList.toggle('on',mode==='scenarios');document.getElementById('scViewAc').classList.toggle('on',mode==='actors');document.getElementById('scCards').style.display=mode==='scenarios'?'grid':'none';document.getElementById('scActorsView').style.display=mode==='actors'?'block':'none';document.getElementById('scGraphTitle').textContent=mode==='scenarios'?'📈 Scenario Evolution':'📈 Qui gagne, qui perd — Evolution';renderScGraph();}
@@ -1073,6 +1068,11 @@ async function testAllScenarios(){
 function showTestDetail(i){const s=(DB.get('tsc_'+AS().id)||[])[i];if(!s)return;const pc=s.probability==='high'?'var(--red)':s.probability==='medium'?'var(--orange)':'var(--ink4)';
   document.getElementById('dpC').innerHTML='<div class="dp-title">'+s.name+'</div><div style="font-size:12px;color:var(--ink3);margin-bottom:16px">"'+( s.hypothesis||'')+'"</div><div style="font-weight:700;color:'+pc+';margin-bottom:16px">'+( s.probability||'?').toUpperCase()+' PROBABILITY</div><div style="font-size:14px;color:var(--ink2);line-height:1.8;margin-bottom:16px">'+(s.analysis||'').replace(/\n/g,'<br>')+'</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">'+(s.supporting?.length?'<div><div style="font-size:11px;font-weight:700;color:var(--green);margin-bottom:6px;border-bottom:2px solid var(--green);padding-bottom:4px">Supporting</div>'+s.supporting.map(x=>'<div style="font-size:12px;padding:4px 0">✅ '+x+'</div>').join('')+'</div>':'')+(s.contradicting?.length?'<div><div style="font-size:11px;font-weight:700;color:var(--red);margin-bottom:6px;border-bottom:2px solid var(--red);padding-bottom:4px">Contradicting</div>'+s.contradicting.map(x=>'<div style="font-size:12px;padding:4px 0">❌ '+x+'</div>').join('')+'</div>':'')+'</div>';
   document.getElementById('dp').classList.add('on');document.getElementById('ov').classList.add('on');}
+
+// Heatmap
+function renderHeatmap(){
+  const sec=AS();const uc=UCf(sec.id);const el=document.getElementById('heatmapWrap');
+  if(!uc.length||!uc.some(u=>u.pil)){el.innerHTML='<div style="color:var(--ink3);text-align:center;padding:32px">Run pipeline to populate</div>';return}
   const byC={};uc.forEach(u=>{if(u.co&&u.co!=='—')(byC[u.co]=byC[u.co]||[]).push(u)});
   const cos=Object.entries(byC).sort((a,b)=>b[1].length-a[1].length).slice(0,15).map(([n])=>n);
   const matrix={};cos.forEach(c=>{matrix[c]={1:0,2:0,3:0,4:0};byC[c].forEach(u=>{if(u.pil)matrix[c][u.pil]++})});
