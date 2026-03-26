@@ -835,9 +835,22 @@ function renderCo(){
 function showCoD(i){const[n,ucs]=window._ce[i];document.getElementById('dpC').innerHTML='<div class="dp-title">'+n+'</div><div style="font-size:13px;color:var(--ink3);margin-bottom:16px">'+ucs.length+' signals · Intensity: '+aiInt(ucs)+'</div>'+ucs.sort((a,b)=>prio(b).sc-prio(a).sc).map(u=>{const p=prio(u);return'<div style="padding:10px 0;border-bottom:1px solid var(--border)"><div style="display:flex;gap:4px;margin-bottom:4px">'+evBadge(u.ev)+' <span class="tag">'+u.tech+'</span> '+pilBadge(u)+' '+prioBadge(p)+'</div><div style="font-weight:600;font-size:13px">'+u.title+'</div><div style="font-size:12px;color:var(--ink3);margin-top:4px">'+(u.desc||'').slice(0,120)+'</div></div>'}).join('');document.getElementById('dp').classList.add('on');document.getElementById('ov').classList.add('on')}
 
 // Trends
-function renderTrends(){const sec=AS();const trends=TRENDS(sec.id);
-  document.getElementById('trendList').innerHTML=trends.length?trends.map(t=>'<div class="card" style="margin-bottom:10px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="display:inline-flex;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;background:'+(t.direction==='accelerating'?'rgba(220,38,38,0.08)':'rgba(37,99,235,0.08)')+';color:'+(t.direction==='accelerating'?'var(--red)':'var(--accent)')+'">'+( t.direction==='accelerating'?'🔥':t.direction==='emerging'?'✨':'→')+' '+t.direction+'</span></div><div style="font-size:15px;font-weight:700;margin-bottom:6px">'+t.name+'</div><div style="font-size:13px;color:var(--ink2);line-height:1.6">'+(t.description||'')+'</div></div>').join(''):'<div class="empty"><div class="empty-i">📈</div><div class="empty-t">No trends</div><div class="empty-s">Run pipeline then Refresh</div></div>';
+function renderTrends(){const sec=AS();const trends=TRENDS(sec.id);window._trends=trends;
+  document.getElementById('trendList').innerHTML=trends.length?trends.map((t,i)=>'<div class="card" style="margin-bottom:10px;cursor:pointer" onclick="showTrendDetail('+i+')"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="display:inline-flex;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;background:'+(t.direction==='accelerating'?'rgba(220,38,38,0.08)':t.direction==='emerging'?'rgba(37,99,235,0.08)':'rgba(113,113,122,0.08)')+';color:'+(t.direction==='accelerating'?'var(--red)':t.direction==='emerging'?'var(--accent)':'var(--ink3)')+'">'+( t.direction==='accelerating'?'🔥':t.direction==='emerging'?'✨':'→')+' '+t.direction+'</span><span style="font-size:11px;color:var(--ink4)">'+(t.companies||[]).length+' companies</span></div><div style="font-size:15px;font-weight:700;margin-bottom:6px">'+t.name+'</div><div style="font-size:13px;color:var(--ink2);line-height:1.6">'+(t.description||'')+'</div><div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:8px">'+(t.companies||[]).map(c=>'<span style="font-size:11px;font-weight:600;background:var(--bg);border-radius:6px;padding:2px 8px;color:var(--ink2)">'+c+'</span>').join('')+'</div></div>').join(''):'<div class="empty"><div class="empty-i">📈</div><div class="empty-t">No trends</div><div class="empty-s">Run pipeline then Refresh</div></div>';
   renderTechMatrix(AS().id);
+}
+function showTrendDetail(i){
+  const t=window._trends?.[i];if(!t)return;const sec=AS();const allUC=UCf(sec.id);
+  const matchUC=allUC.filter(u=>(t.companies||[]).some(c=>u.co&&u.co.toLowerCase().includes(c.toLowerCase())));
+  document.getElementById('dpC').innerHTML=
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><span style="display:inline-flex;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;background:'+(t.direction==='accelerating'?'rgba(220,38,38,0.08)':'rgba(37,99,235,0.08)')+';color:'+(t.direction==='accelerating'?'var(--red)':'var(--accent)')+'">'+t.direction+'</span></div>'
+    +'<div class="dp-title">'+t.name+'</div>'
+    +'<div style="font-size:14px;color:var(--ink2);line-height:1.7;margin-bottom:20px">'+(t.description||'')+'</div>'
+    +'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:20px">'+(t.companies||[]).map(c=>'<span style="font-size:12px;font-weight:600;background:var(--bg);border-radius:6px;padding:3px 10px;color:var(--ink)">'+c+'</span>').join('')+'</div>'
+    +(t.strategic_implication?'<div style="background:rgba(37,99,235,0.04);border-left:3px solid var(--accent);padding:12px 16px;border-radius:0 8px 8px 0;margin-bottom:20px;font-size:13px;line-height:1.6">💡 '+t.strategic_implication+'</div>':'')
+    +'<div style="font-size:12px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Associated signals ('+matchUC.length+')</div>'
+    +(matchUC.length?matchUC.sort((a,b)=>prio(b).sc-prio(a).sc).map(u=>{const p=prio(u);return'<div style="padding:10px 0;border-bottom:1px solid var(--border)"><div style="display:flex;gap:4px;margin-bottom:4px">'+evBadge(u.ev)+' <span class="tag">'+u.tech+'</span> '+prioBadge(p)+'</div><div style="font-weight:600;font-size:13px">'+u.co+' — '+u.title+'</div><div style="font-size:12px;color:var(--ink3);margin-top:4px">'+(u.desc||'').slice(0,120)+'</div></div>';}).join(''):'<div style="font-size:13px;color:var(--ink4);padding:12px 0">No matching signals found</div>');
+  document.getElementById('dp').classList.add('on');document.getElementById('ov').classList.add('on');
 }
 async function clusterTrends(){
   const sec=AS();const uc=UCf(sec.id);if(!uc.length||!DB.get('apiKey')){toast('⚠ Need data + key');return}
@@ -945,9 +958,9 @@ function renderScGraph(){
 
 function renderScCards(scenarios){
   const el=document.getElementById('scCards');const colors=['#dc2626','#2563eb','#16a34a','#ea580c'];
-  const probNum=s=>s.probability==='high'?85:s.probability==='medium'?50:20;
+  const getProb=s=>Math.round((s.prob||s.history?.[s.history.length-1]?.p||0.5)*100);
   const delta=s=>{if(!s.history||s.history.length<2)return{i:'—',t:'New',c:'var(--ink4)'};const prev=s.history[s.history.length-2].p,cur=s.history[s.history.length-1].p;if(cur>prev)return{i:'↑',t:'Up',c:'var(--green)'};if(cur<prev)return{i:'↓',t:'Down',c:'var(--red)'};return{i:'→',t:'Stable',c:'var(--ink4)'}};
-  el.innerHTML=scenarios.map((s,i)=>{const pp=probNum(s);const d=delta(s);const c=colors[i%4];
+  el.innerHTML=scenarios.map((s,i)=>{const pp=getProb(s);const d=delta(s);const c=colors[i%4];
     return'<div class="card" style="cursor:pointer;padding:18px 20px;position:relative;overflow:hidden" onclick="showScDetail('+i+')"><div style="position:absolute;top:0;left:0;right:0;height:3px;background:'+c+'"></div><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><span style="font-size:12px;font-weight:700;color:'+d.c+'">'+d.i+' '+d.t+'</span><span style="font-family:var(--serif);font-size:22px;font-weight:800;color:'+c+'">'+pp+'%</span></div><div style="font-size:14px;font-weight:700;color:var(--ink);margin-bottom:6px;line-height:1.3">'+s.name+'</div><div style="font-size:12px;color:var(--ink3);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">'+(s.description||'')+'</div></div>';
   }).join('');
 }
@@ -955,8 +968,8 @@ function renderScCards(scenarios){
 // ═══ SCENARIO DETAIL — consulting style ═══
 function showScDetail(i){
   const s=window._scenarios?.[i];if(!s)return;
-  const pc=s.probability==='high'?'var(--red)':s.probability==='medium'?'var(--orange)':'var(--ink4)';
-  const pp=s.probability==='high'?85:s.probability==='medium'?50:20;
+  const pp=Math.round((s.prob||s.history?.[s.history.length-1]?.p||0.5)*100);
+  const pc=pp>=65?'var(--red)':pp>=35?'var(--orange)':'var(--ink4)';
   // Build supporting/contradicting signals display
   const confirmSigs=(s.confirming_signals||'').split(/[;.]/).filter(x=>x.trim()).map(x=>'<div style="padding:6px 0;border-bottom:1px solid rgba(22,163,74,0.1);font-size:13px;color:var(--ink2)">✅ '+x.trim()+'</div>').join('');
   const contradictSigs=(s.invalidating_signals||'').split(/[;.]/).filter(x=>x.trim()).map(x=>'<div style="padding:6px 0;border-bottom:1px solid rgba(220,38,38,0.1);font-size:13px;color:var(--ink2)">❌ '+x.trim()+'</div>').join('');
@@ -966,8 +979,10 @@ function showScDetail(i){
     +'<div style="display:flex;align-items:center;gap:12px;margin-bottom:24px"><div style="flex:1;height:8px;background:var(--bg);border-radius:4px;overflow:hidden"><div style="width:'+pp+'%;height:100%;background:'+pc+';border-radius:4px"></div></div><span style="font-size:14px;font-weight:700;color:'+pc+'">'+pp+'%</span></div>'
 
     // ANALYTICAL TEXT — this is the main content
-    +'<div style="font-size:14px;color:var(--ink);line-height:1.8;margin-bottom:24px">'+(s.description||'')+'</div>'
-    +'<div style="font-size:14px;color:var(--ink2);line-height:1.8;margin-bottom:24px">'+(s.rationale||((s.key_drivers||s.drivers||[]).map((d,j)=>'<strong>'+(j+1)+'.</strong> '+d).join('<br><br>'))|| '')+'</div>'
+    +'<div style="font-size:12px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Scenario</div>'
+    +'<div style="font-size:14px;color:var(--ink);line-height:1.8;margin-bottom:20px">'+(s.description||'')+'</div>'
+    +'<div style="font-size:12px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Analysis</div>'
+    +'<div style="font-size:14px;color:var(--ink2);line-height:1.8;margin-bottom:24px;padding:16px;background:var(--bg);border-radius:10px">'+(s.rationale||((s.key_drivers||s.drivers||[]).map((d,j)=>'<strong>'+(j+1)+'.</strong> '+d).join('<br><br>'))|| '')+'</div>'
 
     // SIGNALS POUR / CONTRE
     +(confirmSigs||contradictSigs?
@@ -996,9 +1011,9 @@ async function genScenarios(){
   const dep=uc.filter(u=>['Deployed','Scaled'].includes(u.ev)).length;
   try{const raw=await aiSc(
     'You are a senior strategy consultant in travel distribution. Write analytically like McKinsey — specific, fact-based, citing companies. No jargon, no vague statements.',
-    'Sector: '+sec.name+' | '+uc.length+' signals, '+dep+' deployed | Top: '+topCos+'\n\nSignals:\n'+sigs+'\n\nBuild 3 scenarios. For each provide:\n- name: max 8 words, "What if...?" style\n- description: 2 sentences with company names\n- rationale: 2-3 analytical paragraphs (consulting style) explaining WHY this scenario is at this probability. Cite specific companies and signals. Connect the dots between different signals.\n- probability: low/medium/high\n- supporting_signals: list of specific signals that support this thesis\n- contradicting_signals: list of specific signals that challenge this thesis\n\nReturn ONLY JSON:\n[{"name":"","description":"","rationale":"2-3 paragraphs","probability":"","supporting_signals":["signal 1","signal 2"],"contradicting_signals":["signal 1","signal 2"]}]',4000);
-    const sc=pJ(raw);const now=new Date().toISOString();const pVal=s=>s.probability==='high'?.85:s.probability==='medium'?.5:.2;
-    sc.forEach(s=>{s.created=now;s.last_eval=now;s.history=[{d:now,p:pVal(s)}];s.confirming_signals=(s.supporting_signals||[]).join('; ');s.invalidating_signals=(s.contradicting_signals||[]).join('; ');s.uc_count=uc.length});
+    'Sector: '+sec.name+' | '+uc.length+' signals, '+dep+' deployed | Top: '+topCos+'\n\nSignals:\n'+sigs+'\n\nBuild 3 DIFFERENTIATED scenarios (one optimistic, one moderate, one disruptive). For each provide:\n- name: max 8 words, "What if...?" style\n- description: 2 sentences with company names\n- rationale: 2-3 analytical paragraphs (consulting style) explaining WHY this scenario is at this probability. Cite specific companies and signals.\n- probability_pct: a NUMBER between 10 and 90 representing likelihood percentage. The 3 scenarios MUST have DIFFERENT values (e.g. 70, 45, 25). Do NOT give the same number to all.\n- supporting_signals: list of specific signals that support this thesis\n- contradicting_signals: list of specific signals that challenge this thesis\n\nReturn ONLY JSON:\n[{"name":"","description":"","rationale":"2-3 paragraphs","probability_pct":70,"supporting_signals":["signal 1"],"contradicting_signals":["signal 1"]}]',4000);
+    const sc=pJ(raw);const now=new Date().toISOString();
+    sc.forEach(s=>{const p=(s.probability_pct||50)/100;s.created=now;s.last_eval=now;s.history=[{d:now,p}];s.probability=p>=0.65?'high':p>=0.35?'medium':'low';s.prob=p;s.confirming_signals=(s.supporting_signals||[]).join('; ');s.invalidating_signals=(s.contradicting_signals||[]).join('; ');s.uc_count=uc.length});
     DB.set('sc_'+sec.id,sc);renderSc();toast('✓ '+sc.length+' scenarios');
   }catch(e){toast('⚠ '+e.message)}btn.disabled=false;renderSc()}
 
@@ -1006,12 +1021,12 @@ async function evalScenarios(){
   if(!DB.get('apiKey'))return toast('⚠');const sec=AS();const sc=SCEN(sec.id);const uc=UCf(sec.id);if(!sc.length||!uc.length)return toast('Need scenarios + data');
   const btn=document.getElementById('scActionBtn');btn.disabled=true;btn.textContent='⟳ Evaluating...';
   const sigs=uc.sort((a,b)=>prio(b).sc-prio(a).sc).slice(0,20).map(u=>u.co+': '+u.title+' ('+u.ev+')').join('\n');
-  const scDesc=sc.map((s,i)=>(i+1)+'. '+s.name+' ('+s.probability+')').join('\n');
+  const scDesc=sc.map((s,i)=>(i+1)+'. '+s.name+' (currently '+Math.round((s.prob||s.history?.[s.history.length-1]?.p||0.5)*100)+'%)').join('\n');
   try{const raw=await aiSc(
-    'Re-evaluate strategic scenarios. Write analytically, cite specific companies and signals.',
-    'Scenarios:\n'+scDesc+'\n\nSignals ('+uc.length+'):\n'+sigs+'\n\nFor each scenario:\n- probability: low/medium/high\n- rationale: 1 analytical paragraph explaining the updated probability\n- supporting_signals: specific signals supporting\n- contradicting_signals: specific signals contradicting\n\nReturn ONLY JSON:\n[{"index":0,"probability":"","rationale":"","supporting_signals":[""],"contradicting_signals":[""]}]',3000);
-    const ev=pJ(raw);const now=new Date().toISOString();const pVal=p=>p==='high'?.85:p==='medium'?.5:.2;
-    ev.forEach(e=>{const s=sc[e.index];if(!s)return;s.probability=e.probability;s.rationale=e.rationale||s.rationale;s.confirming_signals=(e.supporting_signals||[]).join('; ');s.invalidating_signals=(e.contradicting_signals||[]).join('; ');s.last_eval=now;if(!s.history)s.history=[];s.history.push({d:now,p:pVal(e.probability)})});
+    'Re-evaluate strategic scenarios. Write analytically, cite specific companies.',
+    'Scenarios:\n'+scDesc+'\n\nNew signals ('+uc.length+' total):\n'+sigs+'\n\nFor each scenario:\n- probability_pct: updated NUMBER 10-90. Each scenario MUST have a DIFFERENT value.\n- rationale: 1 analytical paragraph explaining the change\n- supporting_signals: specific new signals supporting\n- contradicting_signals: specific new signals contradicting\n\nReturn ONLY JSON:\n[{"index":0,"probability_pct":65,"rationale":"","supporting_signals":[""],"contradicting_signals":[""]}]',3000);
+    const ev=pJ(raw);const now=new Date().toISOString();
+    ev.forEach(e=>{const s=sc[e.index];if(!s)return;const p=(e.probability_pct||50)/100;s.prob=p;s.probability=p>=0.65?'high':p>=0.35?'medium':'low';s.rationale=e.rationale||s.rationale;s.confirming_signals=(e.supporting_signals||[]).join('; ');s.invalidating_signals=(e.contradicting_signals||[]).join('; ');s.last_eval=now;if(!s.history)s.history=[];s.history.push({d:now,p})});
     DB.set('sc_'+sec.id,sc);renderSc();toast('✓ Updated');
   }catch(e){toast('⚠ '+e.message)}btn.disabled=false;renderSc()}
 
