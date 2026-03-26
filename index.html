@@ -947,7 +947,7 @@ function renderScGraph(){
       svg+='<text x="'+(last.x+8)+'" y="'+(last.y+5)+'" font-size="13" font-weight="700" fill="'+col+'" font-family="var(--sans)">'+Math.round(lastP*100)+'%</text>';
     });
     svg+='</svg>';el.innerHTML=svg;
-    legEl.innerHTML=scenarios.map((s,i)=>{const pp=Math.round((s.prob||0)*100);return'<div style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer" onclick="showScDetail('+i+')"><span style="width:16px;height:4px;border-radius:2px;background:'+colors[i%6]+'"></span><span style="font-weight:600">'+s.name+'</span><span style="color:var(--ink4)">'+pp+'%</span></div>';}).join('');
+    legEl.innerHTML=scenarios.map((s,i)=>{const pp=Math.round((s.prob||s.history?.[s.history.length-1]?.p||0.5)*100);return'<div style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer" onclick="showScDetail('+i+')"><span style="width:16px;height:4px;border-radius:2px;background:'+colors[i%6]+'"></span><span style="font-weight:600">'+s.name+'</span><span style="color:var(--ink4)">'+pp+'%</span></div>';}).join('');
   }
 }
 
@@ -1316,6 +1316,31 @@ function toast(m){const el=document.getElementById('toast');el.textContent=m;el.
 
   DB.set('_v4migrated',true);
   if(migrated)console.log('[V4 migrate] ✓ Migration complete');
+})();
+
+// ═══ SCENARIO PROB MIGRATOR — fix old low/medium/high to numeric ═══
+(function(){
+  for(let i=0;i<localStorage.length;i++){
+    const k=localStorage.key(i);
+    if(k?.startsWith('sc_')){
+      const sc=DB.get(k);if(!Array.isArray(sc))continue;
+      let fixed=false;
+      sc.forEach(s=>{
+        // If prob is missing or 0, derive from probability text or history
+        if(!s.prob||s.prob===0){
+          if(s.probability_pct){s.prob=s.probability_pct/100;fixed=true}
+          else if(s.probability==='high'){s.prob=0.75;fixed=true}
+          else if(s.probability==='medium'){s.prob=0.5;fixed=true}
+          else if(s.probability==='low'){s.prob=0.25;fixed=true}
+          else if(s.history?.length){s.prob=s.history[s.history.length-1].p;fixed=true}
+          else{s.prob=0.5;fixed=true}
+        }
+        // Fix history entries that have 0 or undefined p
+        if(s.history){s.history.forEach(h=>{if(!h.p||h.p===0){h.p=s.prob;fixed=true}})}
+      });
+      if(fixed){DB.set(k,sc);console.log('[fix] Patched prob values in '+k)}
+    }
+  }
 })();
 
 // ═══ INIT ═══
