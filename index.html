@@ -3,7 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MarketRadar</title>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>MarketRadar V4.1</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -543,7 +546,8 @@ hr.div{border:0;border-top:1px solid var(--border);margin:20px 0}
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn btn-s" onclick="exportAll()">⬇ Export</button>
       <label class="btn btn-s" style="cursor:pointer">⬆ Import<input type="file" accept=".json" onchange="importD(event)" style="display:none" /></label>
-      <button class="btn btn-d" onclick="clearAll()">⚠ Clear</button>
+      <button class="btn btn-d" onclick="resetScenarios()">↻ Reset Scenarios</button>
+      <button class="btn btn-d" onclick="clearAll()">⚠ Clear All</button>
     </div>
   </div>
 </div>
@@ -1172,6 +1176,7 @@ function updSt(){const el=document.getElementById('apiSt');const k=DB.get('apiKe
 function exportAll(){const d={};for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);try{d[k]=JSON.parse(localStorage.getItem(k))}catch{d[k]=localStorage.getItem(k)}}const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(d,null,2)],{type:'application/json'}));a.download='marketradar-v4.json';a.click();toast('✓')}
 function importD(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(confirm('Import?')){Object.entries(d).forEach(([k,v])=>localStorage.setItem(k,typeof v==='string'?v:JSON.stringify(v)));renderAll();toast('✓')}}catch(e){toast('⚠ '+e.message)}};r.readAsText(f)}
 function exportCSV(){const uc=UC();if(!uc.length)return toast('No data');const cols=['sid','co','title','pil','pilSub','tech','ev','conf','funnel','psW','psL','url','date'];const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([[cols.join(';'),...uc.map(u=>cols.map(c=>'"'+(String(u[c]||'').replace(/"/g,'""'))+'"').join(';'))].join('\n')],{type:'text/csv'}));a.download='marketradar-v4.csv';a.click();toast('✓')}
+function resetScenarios(){if(!confirm('Reset all scenarios and power shift data? Use cases will be kept.'))return;const ks=[];for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k?.startsWith('sc_')||k?.startsWith('ps_')||k?.startsWith('tsc_'))ks.push(k)}ks.forEach(k=>localStorage.removeItem(k));toast('✓ Scenarios reset');renderSc()}
 function clearAll(){if(!confirm('Delete ALL?'))return;const ks=[];for(let i=0;i<localStorage.length;i++)ks.push(localStorage.key(i));ks.forEach(k=>localStorage.removeItem(k));location.reload()}
 
 // ═══ WIZARD ═══
