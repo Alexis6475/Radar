@@ -575,7 +575,7 @@ hr.div{border:0;border-top:1px solid var(--border);margin:20px 0}
   <div class="wiz">
     <div class="wiz-h"><div class="wiz-t" id="wizT">New sector</div><div class="wiz-s" id="wizS">Choose a sector</div></div>
     <div class="wiz-b" id="wizB"></div>
-    <div class="wiz-f"><button class="btn btn-g" onclick="document.getElementById('wizOv').classList.remove('on')">Cancel</button><button class="btn btn-p" id="wizNext" onclick="wizN()">Continue →</button></div>
+    <div class="wiz-f"><div style="display:flex;gap:8px"><button class="btn btn-g" onclick="document.getElementById('wizOv').classList.remove('on')">Cancel</button><button class="btn btn-g" id="wizBack" onclick="if(wiz.step>0){wiz.step--;renderWiz()}" style="display:none">← Back</button></div><button class="btn btn-p" id="wizNext" onclick="wizN()">Continue →</button></div>
   </div>
 </div>
 
@@ -1187,23 +1187,112 @@ function exportCSV(){const uc=UC();if(!uc.length)return toast('No data');const c
 function resetScenarios(){if(!confirm('Reset all scenarios and power shift data? Use cases will be kept.'))return;const ks=[];for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k?.startsWith('sc_')||k?.startsWith('ps_')||k?.startsWith('tsc_'))ks.push(k)}ks.forEach(k=>localStorage.removeItem(k));toast('✓ Scenarios reset');renderSc()}
 function clearAll(){if(!confirm('Delete ALL?'))return;const ks=[];for(let i=0;i<localStorage.length;i++)ks.push(localStorage.key(i));ks.forEach(k=>localStorage.removeItem(k));location.reload()}
 
-// ═══ WIZARD ═══
-let wiz={step:0,p:null,src:[]};
-function showWizard(){wiz={step:0,p:null,src:[]};document.getElementById('wizOv').classList.add('on');renderWiz()}
+// ═══ WIZARD — 4 steps ═══
+let wiz={step:0,p:null,src:[],actors:[],geo:'global',hypotheses:[''],suggestedSrc:[]};
+function showWizard(){wiz={step:0,p:null,src:[],actors:[],geo:'global',hypotheses:[''],suggestedSrc:[]};document.getElementById('wizOv').classList.add('on');renderWiz()}
 function renderWiz(){
-  const{step,p}=wiz;document.getElementById('wizT').textContent=['Choose sector','Confirm'][step];document.getElementById('wizS').textContent=['Select a preset','Ready to create'][step];
-  document.getElementById('wizNext').textContent=step===1?'✓ Create':'Continue →';
-  if(step===0){const existing=S().map(s=>s.id);const avail=PRESETS.filter(pr=>pr.id==='custom'||!existing.includes(pr.id));document.getElementById('wizB').innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px">'+avail.map(pr=>'<button class="preset '+(wiz.p?.id===pr.id?'sel':'')+'" onclick="wiz.p=PRESETS.find(x=>x.id===\''+pr.id+'\');wiz.src=(wiz.p?.src||[]).map((_,i)=>i);renderWiz()"><div style="font-size:22px;margin-bottom:6px">'+pr.icon+'</div><div style="font-size:13px;font-weight:600">'+pr.name+'</div><div style="font-size:11px;color:var(--ink3)">'+pr.desc+'</div></button>').join('')+'</div>'+(p?'<div style="margin-top:14px"><label>Research brief</label><textarea id="wizTheme" rows="3" oninput="wiz.theme=this.value">'+(wiz.theme||p.theme||'')+'</textarea></div>':'');}
-  else{document.getElementById('wizB').innerHTML='<div style="text-align:center;padding:16px"><div style="font-size:48px;margin-bottom:12px">'+(p?.icon||'🔍')+'</div><div style="font-family:var(--serif);font-size:22px">'+(p?.name||'New')+'</div><div style="font-size:13px;color:var(--ink3);margin-top:8px">'+(wiz.src.length+(SHARED.length))+' sources</div></div>'}}
-function wizN(){if(wiz.step===0){if(!wiz.p)return toast('Select');wiz.step=1;renderWiz()}else createSec()}
+  const{step,p}=wiz;
+  const titles=['1/4 — Sector & Subject','2/4 — Geography & Key Players','3/4 — Sources','4/4 — Hypotheses (optional)'];
+  const subs=['What market and what topic?','Who are the key players to track?','Where to find articles — AI can suggest sources','Strategic hypotheses to test from day 1'];
+  document.getElementById('wizT').textContent=titles[step]||'';
+  document.getElementById('wizS').textContent=subs[step]||'';
+  document.getElementById('wizNext').textContent=step===3?'✓ Create Sector':step===0?'Continue →':'Continue →';
+  const backBtn=document.getElementById('wizBack');if(backBtn)backBtn.style.display=step>0?'inline-flex':'none';
+
+  const b=document.getElementById('wizB');
+  if(step===0){
+    // STEP 1: Sector preset + research brief
+    const existing=S().map(s=>s.id);const avail=PRESETS.filter(pr=>pr.id==='custom'||!existing.includes(pr.id));
+    b.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px">'+avail.map(pr=>'<button class="preset '+(wiz.p?.id===pr.id?'sel':'')+'" onclick="wiz.p=PRESETS.find(x=>x.id===\''+pr.id+'\');wiz.src=(wiz.p?.src||[]).map((_,i)=>i);wiz.actors=(wiz.p?.kw||[]).slice(0,6);renderWiz()"><div style="font-size:22px;margin-bottom:6px">'+pr.icon+'</div><div style="font-size:13px;font-weight:600">'+pr.name+'</div><div style="font-size:11px;color:var(--ink3)">'+pr.desc+'</div></button>').join('')+'</div>'
+    +(p?'<label style="font-size:12px;font-weight:600">Research brief — what exactly are you looking for?</label><textarea id="wizTheme" rows="3" style="margin-top:4px" oninput="wiz.theme=this.value" placeholder="e.g. Find concrete AI use cases deployed by telecom operators...">'+(wiz.theme||p.theme||'')+'</textarea>':'');
+  }
+  else if(step===1){
+    // STEP 2: Geo + key actors
+    b.innerHTML='<div style="margin-bottom:16px"><label style="font-size:12px;font-weight:600">Geographic scope</label><div style="display:flex;gap:8px;margin-top:6px">'
+    +['global','europe','france','us'].map(g=>'<button class="btn '+(wiz.geo===g?'btn-p':'btn-g')+'" style="font-size:12px" onclick="wiz.geo=\''+g+'\';renderWiz()">'+({global:'🌍 Global',europe:'🇪🇺 Europe',france:'🇫🇷 France',us:'🇺🇸 USA'}[g])+'</button>').join('')
+    +'</div></div>'
+    +'<div style="margin-bottom:12px"><label style="font-size:12px;font-weight:600">Key players to track</label><div style="font-size:11px;color:var(--ink3);margin-bottom:6px">Companies that are most relevant in this sector</div>'
+    +'<div id="wizActors">'+wiz.actors.map((a,i)=>'<div style="display:flex;gap:6px;margin-bottom:4px;align-items:center"><input value="'+a.replace(/"/g,'&quot;')+'" oninput="wiz.actors['+i+']=this.value" style="flex:1;font-size:13px;padding:6px 10px;border-radius:6px" placeholder="Company name" />'+(wiz.actors.length>1?'<button onclick="wiz.actors.splice('+i+',1);renderWiz()" style="border:0;background:0;cursor:pointer;font-size:14px;color:var(--ink4)">✕</button>':'')+'</div>').join('')+'</div>'
+    +'<button onclick="wiz.actors.push(\'\');renderWiz()" style="font-size:12px;color:var(--accent);background:0;border:1px dashed var(--border2);border-radius:6px;padding:6px 14px;cursor:pointer;margin-top:4px;font-family:var(--sans)">+ Add player</button></div>';
+  }
+  else if(step===2){
+    // STEP 3: Sources
+    const allSrc=[...(wiz.p?.src||[]),...wiz.suggestedSrc];
+    b.innerHTML='<div style="margin-bottom:12px"><label style="font-size:12px;font-weight:600">RSS Sources ('+allSrc.length+' configured)</label>'
+    +'<div style="font-size:11px;color:var(--ink3);margin-bottom:8px">These are the websites MarketRadar will read every week</div>'
+    +'<div style="max-height:200px;overflow-y:auto;margin-bottom:12px">'+allSrc.map((s,i)=>'<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)"><input type="checkbox" '+(wiz.src.includes(i)?'checked':'')+' onchange="if(this.checked){wiz.src.push('+i+')}else{wiz.src=wiz.src.filter(x=>x!=='+i+')};renderWiz()" /><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600">'+s.n+'</div><div style="font-size:11px;color:var(--ink4);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+s.u+'</div></div><span style="font-size:10px;color:var(--ink4);background:var(--bg);padding:2px 6px;border-radius:4px">'+s.c+'</span></div>').join('')+'</div>'
+    // Add custom source
+    +'<div style="display:flex;gap:6px;margin-bottom:12px"><input id="wizNewSrcN" placeholder="Source name" style="width:140px;font-size:12px;padding:6px 8px;border-radius:6px" /><input id="wizNewSrcU" placeholder="RSS URL (https://...)" style="flex:1;font-size:12px;padding:6px 8px;border-radius:6px" /><button class="btn btn-g" style="font-size:11px;white-space:nowrap" onclick="addWizSrc()">+ Add</button></div>'
+    // AI suggest button
+    +'<div style="border-top:1px solid var(--border);padding-top:12px"><button class="btn btn-s" onclick="suggestSources()" id="wizSuggestBtn" style="font-size:12px">🤖 Suggest sources with AI</button><span id="wizSuggestInfo" style="font-size:11px;color:var(--ink4);margin-left:8px"></span></div></div>';
+  }
+  else if(step===3){
+    // STEP 4: Hypotheses (optional)
+    b.innerHTML='<div style="margin-bottom:12px"><label style="font-size:12px;font-weight:600">Initial hypotheses to test (optional)</label>'
+    +'<div style="font-size:11px;color:var(--ink3);margin-bottom:8px">Strategic hypotheses that AI will evaluate against your signals each week</div>'
+    +'<div id="wizHyp">'+wiz.hypotheses.map((h,i)=>'<div style="display:flex;gap:6px;margin-bottom:4px"><span style="font-size:12px;font-weight:700;color:var(--ink4);padding-top:8px;width:16px">'+(i+1)+'</span><input value="'+h.replace(/"/g,'&quot;')+'" oninput="wiz.hypotheses['+i+']=this.value" style="flex:1;font-size:13px;padding:6px 10px;border-radius:6px" placeholder="e.g. Google will become the main booking channel for travel" />'+(wiz.hypotheses.length>1?'<button onclick="wiz.hypotheses.splice('+i+',1);renderWiz()" style="border:0;background:0;cursor:pointer;font-size:14px;color:var(--ink4)">✕</button>':'')+'</div>').join('')+'</div>'
+    +'<button onclick="wiz.hypotheses.push(\'\');renderWiz()" style="font-size:12px;color:var(--accent);background:0;border:1px dashed var(--border2);border-radius:6px;padding:6px 14px;cursor:pointer;margin-top:4px;font-family:var(--sans)">+ Add hypothesis</button></div>'
+    // Summary
+    +'<div style="margin-top:20px;padding:14px;background:var(--bg);border-radius:10px"><div style="font-size:12px;font-weight:700;color:var(--ink);margin-bottom:8px">Summary</div>'
+    +'<div style="font-size:12px;color:var(--ink2);line-height:1.6">'
+    +'<strong>Sector:</strong> '+(wiz.p?.name||'Custom')+'<br>'
+    +'<strong>Scope:</strong> '+wiz.geo+'<br>'
+    +'<strong>Players:</strong> '+wiz.actors.filter(a=>a.trim()).join(', ')+'<br>'
+    +'<strong>Sources:</strong> '+wiz.src.length+' selected + '+SHARED.length+' shared<br>'
+    +'<strong>Hypotheses:</strong> '+wiz.hypotheses.filter(h=>h.trim()).length
+    +'</div></div>';
+  }
+}
+function wizN(){
+  if(wiz.step===0){if(!wiz.p)return toast('Select a sector');wiz.step=1;renderWiz()}
+  else if(wiz.step===1){wiz.step=2;renderWiz()}
+  else if(wiz.step===2){wiz.step=3;renderWiz()}
+  else createSec();
+}
+function addWizSrc(){
+  const n=document.getElementById('wizNewSrcN')?.value?.trim();
+  const u=document.getElementById('wizNewSrcU')?.value?.trim();
+  if(!n||!u)return toast('Name + URL needed');
+  wiz.suggestedSrc.push({c:'Custom',n,u});
+  const allSrc=[...(wiz.p?.src||[]),...wiz.suggestedSrc];
+  wiz.src.push(allSrc.length-1);
+  renderWiz();toast('✓ Added '+n);
+}
+async function suggestSources(){
+  if(!DB.get('apiKey'))return toast('⚠ API key needed in Settings');
+  const btn=document.getElementById('wizSuggestBtn');btn.disabled=true;btn.textContent='⟳ Searching...';
+  const info=document.getElementById('wizSuggestInfo');
+  try{const raw=await ai(
+    'You help find RSS feeds for market research. Return ONLY valid JSON.',
+    'I need RSS feeds for monitoring this sector: '+(wiz.p?.name||'general')+'\nSubject: '+(wiz.theme||wiz.p?.theme||'AI use cases')+'\nGeography: '+wiz.geo+'\nKey players: '+wiz.actors.filter(a=>a.trim()).join(', ')+'\n\nSuggest 5-8 RSS feed URLs. Include industry-specific media, Google News searches, and company blogs if relevant.\nFor Google News, format: https://news.google.com/rss/search?q=YOUR+SEARCH+TERMS&hl=en&gl=US&ceid=US:en\n\nReturn ONLY JSON array:\n[{"category":"Press|Blog|Google News","name":"source name","url":"full RSS url"}]',1024);
+    const suggested=pJ(raw);
+    suggested.forEach(s=>{
+      if(!wiz.suggestedSrc.find(x=>x.u===s.url)){
+        wiz.suggestedSrc.push({c:s.category||'AI Suggested',n:s.name,u:s.url});
+      }
+    });
+    // Auto-select all new ones
+    const allSrc=[...(wiz.p?.src||[]),...wiz.suggestedSrc];
+    wiz.src=[...new Set([...wiz.src,...allSrc.map((_,i)=>i)])];
+    renderWiz();if(info)info.textContent=suggested.length+' sources suggested';toast('✓ '+suggested.length+' sources found');
+  }catch(e){toast('⚠ '+e.message)}btn.disabled=false;btn.textContent='🤖 Suggest sources with AI';
+}
 function createSec(){
   const p=wiz.p;const name=p.name;const id=name.toLowerCase().replace(/[^a-z0-9]/g,'')+(p.id==='custom'?Date.now():'');
-  const ss=S();if(ss.find(s=>s.id===id))return toast('Exists');
-  ss.push({id,name,color:p.color,icon:p.icon,tracker:{name:name+' Intelligence',theme:wiz.theme||p.theme||'',kw:p.kw||[]}});DB.set('sectors',ss);
+  const ss=S();if(ss.find(s=>s.id===id))return toast('Sector already exists');
+  // Build tracker with all wizard data
+  const tracker={name:name+' Intelligence',theme:wiz.theme||p.theme||'',kw:wiz.actors.filter(a=>a.trim()),geo:wiz.geo};
+  ss.push({id,name,color:p.color,icon:p.icon,tracker});DB.set('sectors',ss);
+  // Add selected sources
   const src=SRC();let nid=Math.max(...src.map(s=>s.id),100)+1;
-  wiz.src.map(i=>(p.src||[])[i]).filter(Boolean).forEach(s=>{src.push({id:nid++,sec:id,c:s.c,n:s.n,u:s.u,on:1})});
+  const allSrc=[...(p.src||[]),...wiz.suggestedSrc];
+  wiz.src.map(i=>allSrc[i]).filter(Boolean).forEach(s=>{src.push({id:nid++,sec:id,c:s.c,n:s.n,u:s.u,on:1})});
   SHARED.forEach(s=>{if(!src.find(x=>x.sec==='shared'&&x.u===s.u))src.push({id:nid++,sec:'shared',c:s.c,n:s.n,u:s.u,on:1})});
-  DB.set('sources',src);document.getElementById('wizOv').classList.remove('on');setAS(id);toast('✓ '+name+' created');
+  DB.set('sources',src);
+  // Save hypotheses for test scenarios
+  const hyps=wiz.hypotheses.filter(h=>h.trim());
+  if(hyps.length){DB.set('tsc_pending_'+id,hyps)}
+  document.getElementById('wizOv').classList.remove('on');setAS(id);toast('✓ '+name+' created with '+wiz.src.length+' sources');
 }
 
 // ═══ RENDER ALL ═══
